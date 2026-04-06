@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Complete Payment</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="payment-redirect-shell">
+    <div class="payment-redirect-card">
+      <div class="payment-redirect-spinner"></div>
+      <h2>Redirecting to Secure Payment</h2>
+      <p>Please wait while we connect you to our payment gateway.</p>
+    </div>
+  </div>
+
+  <form id="payfastForm" method="post"></form>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="/firebase/init.js"></script>
+  <script src="/js/payfast-config.js"></script>
+  <script>
+    function parsePositiveInt(value) {
+      var n = parseInt(String(value == null ? '' : value).trim(), 10);
+      return Number.isInteger(n) && n >= 1 ? n : null;
+    }
+
+    function toAmount(value) {
+      var n = Number(value);
+      if (!Number.isFinite(n) || n < 0) return null;
+      return Math.round(n * 100) / 100;
+    }
+
+    async function getCouponDiscount(couponCode) {
+      var code = String(couponCode || '').trim().toUpperCase();
+      if (!code) return null;
+      try {
+        var db = window.db;
+        if (!db || !db.collection) return null;
+        const couponDoc = await db.collection("coupons").doc(code).get();
+        if (!couponDoc.exists) return null;
+        var couponData = couponDoc.data() || {};
+        if (couponData.active !== true) return null;
+        var type = String(couponData.type || '').toLowerCase();
+        var value = Number(couponData.value);
+        if (!Number.isFinite(value) || value < 0) return null;
+        if (type !== 'percent' && type !== 'fixed') return null;
+        return { code: code, type: type, value: value };
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function uniquePaymentId() {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 12);
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    let product = String(params.get('product') || '').trim().toLowerCase();
+    const adIdRaw = params.get('adId');
+    if (product !== 'ad' && product !== 'logbook' && adIdRaw && params.get('amount') && params.get('email')) {
+      product = 'ad';
+    }
+    if (product !== 'ad' && product !== 'logbook' && params.get('custom_str1') && params.get('amount') && !adIdRaw) {
+      product = 'logbook';
+    }
+    const config = window.PAYFAST_CONFIG;
+    const form = document.getElementById('payfastForm');
+    form.action = config.sandbox
+      ? "https://sandbox.payfast.co.za/eng/process"
+      : "https://www.payfast.co.za/eng/process";
+
+    const baseReturn = String(
+      config.return_url || (window.location.origin + "/payment-success.html")
+    ).replace(/\?[\s\S]*$/, "");
+    const baseCancel = String(
+      config.cancel_url || (window.location.origin + "/payment-cancel.html")
+    ).replace(/\?[\s\S]*$/, "");
+
+    const origin = window.location.origin;
+    const fields = {
+      merchant_id: config.merchant_id,
+      merchant_key: config.merchant_key,
+      notify_url: config.notify_url,
+      m_payment_id: uniquePaymentId(),
+      return_url: `${origin}/payment-success.html?product=logbook`,
+      cancel_url: `${origin}/logbook.html`,
+    };
+
+    async function processPayment() {
+    var IS_DEV =
+      location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1';
+
+    if (product === 'ad' && IS_DEV) {
+      const adId = String(adIdRaw || '').trim();
+      const amount = params.get('amount');
+      const email = String(params.get('email') || '').trim();
+      const card = document.querySelector('.payment-redirect-card');
+      if (!adId || !amount || !email) {
+        if (card) {
+          card.innerHTML =
+            '<h2>Invalid payment link</h2><p>Missing ad payment details.</p>';
+        }
+        return;
+      }
+      var months = parsePositiveInt(params.get('months'));
+      if (months == null) months = 1;
+      var db = window.db;
+      if (!db) {
+        if (card) {
+          card.innerHTML =
+            '<h2>DEV bypass failed</h2><p>Firestore not initialized.</p>';
+        }
+        return;
+      }
+      try {
+        var adRef = db.collection('sponsoredTools').doc(adId);
+        var adSnap = await adRef.get();
+        if (!adSnap.exists) {
+          if (card) card.innerHTML = '<h2>Ad not found</h2>';
+          return;
+        }
+        var adData = adSnap.data() || {};
+        var st = String(adData.status || '').toLowerCase();
+        if (st !== 'approved') {
+          if (card) {
+            card.innerHTML =
+              '<h2>DEV MODE</h2><p>Ad must be approved before payment. Current status: ' +
+              String(st).replace(/</g, '') +
+              '</p>';
+          }
+          return;
+        }
+        var now = Date.now();
+        var expiry = now + months * 30 * 24 * 60 * 60 * 1000;
+        await adRef.update({
+          status: 'live',
+          paidAt: now,
+          monthsPurchased: months,
+          expiresAt: expiry
+        });
+        console.log('DEV MODE: Payment skipped — ad activated locally');
+      } catch (e) {
+        console.error(e);
+        if (card) {
+          card.innerHTML =
+            '<h2>DEV bypass failed</h2><p>' +
+            String((e && e.message) || e).replace(/</g, '') +
+            '</p>';
+        }
+        return;
+      }
+      if (card) {
+        card.innerHTML =
+          '<h2>DEV MODE: Payment skipped</h2><p>Redirecting…</p>';
+      }
+      setTimeout(function () {
+        window.location.href =
+          origin + '/payment-success.html?product=ad&adId=' + encodeURIComponent(adId);
+      }, 400);
+      return;
+    }
+
+    if (product === 'ad') {
+      const adId = String(adIdRaw || '').trim();
+      const amount = params.get('amount');
+      const email = String(params.get('email') || '').trim();
+      const item_name = params.get('item_name') || 'Sponsored Ad';
+      if (!adId || !amount || !email) {
+        document.querySelector('.payment-redirect-card').innerHTML =
+          '<h2>Invalid payment link</h2><p>Missing ad payment details.</p>';
+        return;
+      }
+      var months = parsePositiveInt(params.get('months'));
+      if (months == null) {
+        months = 1;
+      }
+      fields.m_payment_id = adId;
+      fields.amount = amount;
+      fields.item_name = item_name;
+      fields.email_address = email;
+      fields.custom_str1 = String(months);
+      fields.custom_str2 = 'ad';
+      fields.notify_url =
+        'https://us-central1-autologbook-sa.cloudfunctions.net/payfastNotify';
+      fields.return_url = `${origin}/payment-success.html?product=ad&adId=${encodeURIComponent(adId)}`;
+      fields.cancel_url = origin + '/payment-cancel.html?product=ad';
+      console.log('PAYMENT AD ID:', adId);
+    } else if (product === 'logbook') {
+      const paymentId = String(params.get('custom_str1') || '').trim();
+      let email = String(params.get('email') || '').trim();
+      const custom_str3 = params.get('custom_str3');
+      const tokensRaw = params.get('tokens') || params.get('custom_str4');
+      const tokens = parsePositiveInt(tokensRaw);
+      const amount = toAmount(params.get('amount'));
+      const item_name = params.get('item_name') || 'Logbook Generation';
+      const coupon = String(params.get('coupon') || '').trim();
+      if (!paymentId) {
+        document.querySelector('.payment-redirect-card').innerHTML =
+          '<h2>Invalid payment link</h2><p>Missing logbook payment details.</p>';
+        return;
+      }
+      if (!email) {
+        const prompted = prompt('Enter your email');
+        if (prompted == null || !String(prompted).trim()) {
+          document.querySelector('.payment-redirect-card').innerHTML =
+            '<h2>Invalid payment link</h2><p>Email is required for payment.</p>';
+          return;
+        }
+        email = String(prompted).trim();
+      }
+      if (amount == null) {
+        document.querySelector('.payment-redirect-card').innerHTML =
+          '<h2>Invalid payment link</h2><p>Missing logbook payment details.</p>';
+        return;
+      }
+      var finalAmount = amount;
+      if (coupon) {
+        var discount = await getCouponDiscount(coupon);
+        if (discount) {
+          if (discount.type === 'percent') {
+            finalAmount = finalAmount - ((finalAmount * discount.value) / 100);
+          } else if (discount.type === 'fixed') {
+            finalAmount = finalAmount - discount.value;
+          }
+          finalAmount = Math.max(0, Math.round(finalAmount * 100) / 100);
+          fields.custom_str5 = discount.code;
+        }
+      }
+      fields.amount = finalAmount.toFixed(2);
+      fields.item_name = item_name;
+      fields.email_address = email;
+      fields.custom_str1 = paymentId;
+      fields.custom_str2 = 'logbook';
+      if (custom_str3) fields.custom_str3 = custom_str3;
+      if (tokens) fields.custom_str4 = String(tokens);
+      fields.return_url = `${origin}/payment-success.html?product=logbook`;
+      fields.cancel_url = `${origin}/logbook.html`;
+      try {
+        localStorage.setItem("userEmail", email);
+      } catch (_e) {}
+    } else {
+      document.querySelector('.payment-redirect-card').innerHTML =
+        '<h2>Invalid payment link</h2><p>Missing payment details.</p>';
+      return;
+    }
+
+    Object.keys(fields).forEach(key => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = fields[key] != null ? fields[key] : '';
+      form.appendChild(input);
+    });
+
+    form.submit();
+    }
+    processPayment();
+  </script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Payment successful</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="landing-page">
+  <div class="payment-success-shell">
+    <div class="payment-success-card" id="status">
+      <img src="/assets/logos/auto_logbook_logo-color%20(1).png" alt="Auto Logbook SA" style="display:block;max-width:320px;width:100%;height:auto;margin:0 auto 14px;" />
+      <div class="payment-success-icon">✓</div>
+      <h1>Payment Received</h1>
+      <p>
+        Your payment was successful. We are preparing your logbook access.
+      </p>
+      <p class="payment-success-sub">
+        Your access link has been sent to your email address.
+      </p>
+      <button id="backHomeBtn" class="btn btn-primary" style="margin-top: 20px;">
+        Back to Home
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var product = (params.get("product") || "").toLowerCase();
+      var statusEl = document.getElementById("status");
+
+      if (product === "ad") {
+        statusEl.innerHTML =
+          '<img src="/assets/logos/auto_logbook_logo-color%20(1).png" alt="Auto Logbook SA" style="display:block;max-width:320px;width:100%;height:auto;margin:0 auto 14px;" />' +
+          '<div class="payment-success-icon">✓</div>' +
+          "<h1>Payment Received</h1>" +
+          "<p>Thank you. Your sponsored placement payment was successful.</p>" +
+          '<p class="payment-success-sub">Your ad will go live when PayFast sends the payment confirmation (usually within a few minutes).</p>';
+        return;
+      }
+
+      statusEl.innerHTML =
+        '<img src="/assets/logos/auto_logbook_logo-color%20(1).png" alt="Auto Logbook SA" style="display:block;max-width:320px;width:100%;height:auto;margin:0 auto 14px;" />' +
+        '<div class="payment-success-icon">✓</div>' +
+        "<h1>Payment Received</h1>" +
+        "<p>Your payment was successful. We are preparing your logbook access.</p>" +
+        '<p class="payment-success-sub">Your access email will be sent shortly.</p>';
+    })();
+
+    (function () {
+      var statusEl = document.getElementById("status");
+      if (!statusEl) return;
+      function ensureBackButton() {
+        if (document.getElementById("backHomeBtn")) return;
+        var btn = document.createElement("button");
+        btn.id = "backHomeBtn";
+        btn.className = "btn btn-primary";
+        btn.style.marginTop = "20px";
+        btn.textContent = "Back to Home";
+        btn.addEventListener("click", function () {
+          window.location.href = "/";
+        });
+        statusEl.appendChild(btn);
+      }
+      ensureBackButton();
+      new MutationObserver(ensureBackButton).observe(statusEl, { childList: true, subtree: true });
+    })();
+
+    document.getElementById("backHomeBtn")?.addEventListener("click", () => {
+      window.location.href = "/";
+    });
+  </script>
+</body>
+</html>

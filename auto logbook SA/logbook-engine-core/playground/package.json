@@ -1,0 +1,14 @@
+{
+  "name": "logbook-engine-playground",
+  "version": "1.0.0",
+  "description": "Standalone test harness for logbook engine",
+  "type": "module",
+  "scripts": {
+    "serve": "npx serve ."
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
+
+

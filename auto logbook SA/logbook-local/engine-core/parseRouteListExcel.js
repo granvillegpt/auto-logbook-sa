@@ -1,0 +1,181 @@
+/**
+ * Parse Route List Excel File
+ *
+ * Parses Excel route list template into routes array for the engine.
+ */
+
+import * as XLSX from 'xlsx';
+
+/**
+ * Finds column index by name (case-insensitive)
+ */
+function findColumnIndex(headerRow, columnName) {
+    const normalizedName = columnName.toLowerCase().trim();
+    for (let i = 0; i < headerRow.length; i++) {
+        if (headerRow[i] && headerRow[i].toString().toLowerCase().trim() === normalizedName) {
+            return i;
+        }
+    }
+    return null;
+}
+
+/**
+ * Converts Excel cell value to boolean
+ */
+function cellToBoolean(value) {
+    if (value === null || value === undefined || value === '') {
+        return false;
+    }
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+    const str = String(value).toLowerCase().trim();
+    return str === 'true' || str === '1' || str === 'x' || str === 'yes';
+}
+
+/**
+ * Parse Excel file to routes array
+ * @param {Buffer|ArrayBuffer} fileBuffer - Excel file buffer (Node Buffer or browser ArrayBuffer)
+ * @returns {Array} Routes array in format expected by engine
+ */
+export function parseRouteListExcel(fileBuffer) {
+    const isArrayBuffer = typeof ArrayBuffer !== 'undefined' && fileBuffer instanceof ArrayBuffer;
+    const buf = isArrayBuffer ? new Uint8Array(fileBuffer) : fileBuffer;
+    const workbook = XLSX.read(buf, { type: isArrayBuffer ? 'array' : 'buffer' });
+    const firstSheetName = workbook.SheetNames[0];
+
+    if (!firstSheetName) {
+        throw new Error('Excel file has no sheets');
+    }
+
+    const worksheet = workbook.Sheets[firstSheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+
+    if (jsonData.length === 0) {
+        throw new Error('Excel sheet is empty');
+    }
+
+    // Find header row (scan first 10 rows)
+    const maxRowsToScan = Math.min(10, jsonData.length);
+    let headerRowIndex = 0;
+    let bestMatchCount = 0;
+
+    for (let rowIdx = 0; rowIdx < maxRowsToScan; rowIdx++) {
+        const row = jsonData[rowIdx];
+        if (!row || row.length === 0) {
+            continue;
+        }
+
+        let matchCount = 0;
+        const rowLower = row.map(cell => cell ? String(cell).toLowerCase().trim().replace(/\s+/g, ' ') : '');
+
+        if (rowLower.includes('address') || rowLower.includes('street address')) matchCount++;
+        if (rowLower.includes('customer') || rowLower.includes('client')) matchCount++;
+        if (rowLower.includes('mon') || rowLower.includes('monday')) matchCount++;
+        if (rowLower.includes('tue') || rowLower.includes('tuesday')) matchCount++;
+        if (rowLower.includes('wed') || rowLower.includes('wednesday')) matchCount++;
+        if (rowLower.includes('thu') || rowLower.includes('thursday')) matchCount++;
+        if (rowLower.includes('fri') || rowLower.includes('friday')) matchCount++;
+
+        if (matchCount > bestMatchCount) {
+            bestMatchCount = matchCount;
+            headerRowIndex = rowIdx;
+        }
+    }
+
+    const headerRow = jsonData[headerRowIndex];
+    if (!headerRow || headerRow.length === 0) {
+        throw new Error('Could not find header row in Excel file. Please ensure your Excel file has column headers.');
+    }
+
+    // Find column indices
+    const streetAddressCol = findColumnIndex(headerRow, 'street address') || findColumnIndex(headerRow, 'address');
+    const suburbCol = findColumnIndex(headerRow, 'suburb');
+    const cityCol = findColumnIndex(headerRow, 'city');
+    const provinceCol = findColumnIndex(headerRow, 'province');
+    const customerCol = findColumnIndex(headerRow, 'customer') || findColumnIndex(headerRow, 'client');
+    const monCol = findColumnIndex(headerRow, 'mon') || findColumnIndex(headerRow, 'monday');
+    const tueCol = findColumnIndex(headerRow, 'tue') || findColumnIndex(headerRow, 'tuesday');
+    const wedCol = findColumnIndex(headerRow, 'wed') || findColumnIndex(headerRow, 'wednesday');
+    const thuCol = findColumnIndex(headerRow, 'thu') || findColumnIndex(headerRow, 'thursday');
+    const friCol = findColumnIndex(headerRow, 'fri') || findColumnIndex(headerRow, 'friday');
+    const satCol = findColumnIndex(headerRow, 'sat') || findColumnIndex(headerRow, 'saturday');
+    const weeksCol = findColumnIndex(headerRow, 'weeks') || findColumnIndex(headerRow, 'week');
+
+    const hasAddressColumns = streetAddressCol !== null && suburbCol !== null && cityCol !== null && provinceCol !== null;
+    const customerOnlyMode = !hasAddressColumns && customerCol !== null;
+
+    if (!hasAddressColumns && !customerOnlyMode) {
+        throw new Error('Could not find required columns. Need either: (1) Street Address, Suburb, City, Province, or (2) Customer plus Monday–Saturday and Week.');
+    }
+
+    // Parse data rows
+    const routes = [];
+    for (let rowIdx = headerRowIndex + 1; rowIdx < jsonData.length; rowIdx++) {
+        const row = jsonData[rowIdx];
+        if (!row || row.length === 0) {
+            continue;
+        }
+
+        let streetAddress, suburb, city, province, fullAddress, customer;
+
+        if (customerOnlyMode) {
+            customer = (row[customerCol] || '').toString().trim();
+            if (!customer) continue;
+            streetAddress = customer;
+            suburb = '—';
+            city = '—';
+            province = 'South Africa';
+            fullAddress = `${streetAddress}, ${suburb}, ${city}, ${province}`;
+        } else {
+            streetAddress = (row[streetAddressCol] || '').toString().trim();
+            suburb = (row[suburbCol] || '').toString().trim();
+            city = (row[cityCol] || '').toString().trim();
+            province = (row[provinceCol] || '').toString().trim();
+            if (!streetAddress) continue;
+            if (!suburb || !city || !province) continue;
+            fullAddress = `${streetAddress}, ${suburb}, ${city}, ${province}, South Africa`;
+            customer = customerCol !== null && row[customerCol] ? String(row[customerCol]).trim() : fullAddress;
+        }
+
+        // Parse days
+        const days = {
+            mon: monCol !== null ? cellToBoolean(row[monCol]) : false,
+            tue: tueCol !== null ? cellToBoolean(row[tueCol]) : false,
+            wed: wedCol !== null ? cellToBoolean(row[wedCol]) : false,
+            thu: thuCol !== null ? cellToBoolean(row[thuCol]) : false,
+            fri: friCol !== null ? cellToBoolean(row[friCol]) : false,
+            sat: satCol !== null ? cellToBoolean(row[satCol]) : false
+        };
+
+        // Parse weeks (default to all weeks if not specified)
+        let weeks = [1, 2, 3, 4];
+        if (weeksCol !== null && row[weeksCol]) {
+            const weeksValue = String(row[weeksCol]).trim();
+            if (weeksValue) {
+                const parsedWeeks = weeksValue.split(',').map(w => parseInt(w.trim(), 10)).filter(w => !isNaN(w) && w >= 1 && w <= 4);
+                if (parsedWeeks.length > 0) {
+                    weeks = parsedWeeks;
+                }
+            }
+        }
+
+        routes.push({
+            customer: customer,
+            address: fullAddress,
+            suburb: suburb,
+            days: days,
+            weeks: weeks,
+            rowIndex: rowIdx - headerRowIndex
+        });
+    }
+
+    if (routes.length === 0) {
+        throw new Error('No valid routes found in Excel file. Please ensure your file has at least one row with an Address and enabled days.');
+    }
+
+    return routes;
+}

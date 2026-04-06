@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Promote your tool – Auto Logbook SA</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/logbook-page.css" />
+  <link rel="icon" type="image/x-icon" href="/assets/logos/favicon.ico" sizes="32x32">
+  <style>
+    .ad-image-bg {
+      pointer-events: none;
+    }
+    #focalPreviewImage {
+      pointer-events: auto;
+    }
+
+    /* Homepage slot mirror (matches index.html Recommended Tools layout) */
+    .homepage-ad-preview-mirror {
+      margin-top: 8px;
+    }
+    #adPreviewSlotLabel {
+      font-size: 13px;
+      color: var(--text-muted, #6b7280);
+      margin: 0 0 12px;
+    }
+    .ad-preview-featured-inner .slot-card.ad-slot-card {
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+      height: auto !important;
+    }
+    .ad-preview-featured-inner .tool-image.ad-image-wrapper {
+      height: 320px !important;
+      overflow: hidden;
+    }
+    .ad-preview-featured-inner .ad-image-main {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+    .ad-preview-slots-outer .slots-grid.ad-preview-single-slot {
+      grid-template-columns: minmax(0, 1fr);
+      max-width: 100%;
+    }
+    .ad-preview-slots-outer .slot-card.ad-slot-card {
+      height: auto !important;
+    }
+  </style>
+</head>
+<body class="landing-page">
+  <header class="site-header site-header-landing">
+    <div class="container header-inner">
+      <a href="index.html" class="brand"><img src="assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
+      <nav class="site-nav">
+        <a href="index.html">Home</a>
+        <a href="index.html#how-it-works">How it Works</a>
+        <a href="index.html#templates">Templates</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-container">
+      <div class="container" style="max-width: 720px; margin: 0 auto;">
+        <div class="routelist-wrapper">
+          <div class="routelist-card logbook-card">
+            <h2>Promote your tool to Auto Logbook SA users</h2>
+            <p class="logbook-subtitle">
+              Book your placement for a specific month and reach drivers, contractors, and sales reps using Auto Logbook SA.
+            </p>
+
+            <form id="advertiseForm">
+              <div class="form-group">
+                <span class="review-form-label">Slot</span>
+                <div id="slotPricing" style="font-size:13px; color:#666; margin-bottom:8px;"></div>
+                <div id="slotSelector" class="slot-selector">
+                  <button type="button" class="slot-btn selected" data-slot="featured">Featured placement</button>
+                  <button type="button" class="slot-btn" data-slot="slot1">Slot 1</button>
+                  <button type="button" class="slot-btn" data-slot="slot2">Slot 2</button>
+                  <button type="button" class="slot-btn" data-slot="slot3">Slot 3</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <span class="review-form-label">Months</span>
+                <div id="monthGrid" class="month-grid"></div>
+              </div>
+              <div id="selectionSummary" class="selection-summary">
+                Select a slot to begin
+              </div>
+              <div class="form-group">
+                <label for="advertiseCompany">Company Name</label>
+                <input type="text" id="advertiseCompany" name="companyName" placeholder="Your company name" required>
+              </div>
+              <div class="form-group">
+                <label for="contactEmail">Contact Email</label>
+                <input type="email" name="contactEmail" id="contactEmail" required placeholder="name@company.com">
+              </div>
+              <div class="form-group">
+                <label for="advertiseTool">Tool Name</label>
+                <input type="text" id="advertiseTool" name="toolName" placeholder="Name of the tool or product" required>
+              </div>
+              <div class="form-group">
+                <label for="advertiseDescription">Description</label>
+                <textarea id="advertiseDescription" name="description" rows="3" placeholder="Short description for users" required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="adImageInput">Ad image <span class="text-muted" style="font-weight:normal;">(optional, recommended)</span></label>
+                <input type="file" id="adImageInput" name="imageUpload" accept="image/*" aria-describedby="imageUploadHint" />
+                <p id="imageUploadHint" class="review-form-message" style="font-size: 13px; color: var(--text-muted, #666); margin-top: 6px;">
+                  PNG or JPG, max 5&nbsp;MB. Shown on the homepage if you include one.
+                </p>
+                <div id="imagePreview" class="preview-box" aria-label="Image position preview">
+                  <img id="imagePreviewImage" class="preview-image hidden" alt="Ad image position preview" />
+                </div>
+                <div id="imagePreviewWrapper" class="image-preview-wrapper hidden" role="region" aria-label="Selected ad image">
+                  <div class="image-preview-confirmed">
+                    <p class="image-preview-label">Image ready</p>
+                    <img id="imagePreviewThumb" class="image-preview-thumb" alt="" />
+                    <button type="button" id="imageChangeBtn" class="btn btn-secondary">Change image</button>
+                  </div>
+                </div>
+                <div id="focalPreviewWrapper" style="
+                  width: 100%;
+                  max-width: 500px;
+                  height: 280px;
+                  border: 1px solid #ddd;
+                  border-radius: 12px;
+                  overflow: hidden;
+                  position: relative;
+                  background: #f5f5f5;
+                  margin-top: 10px;
+                  display: none;
+                ">
+                  <img id="focalPreviewImage" style="
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    cursor: grab;
+                  " alt="" />
+                </div>
+                <input type="hidden" id="imagePosX" value="50">
+                <input type="hidden" id="imagePosY" value="50">
+              </div>
+              <div class="form-group">
+                <label for="url">Website <span class="text-muted" style="font-weight:normal;">(optional)</span></label>
+                <input type="url" id="url" name="url" inputmode="url" autocomplete="url" placeholder="https://example.com" />
+              </div>
+              <div class="form-group">
+                <label for="whatsapp">WhatsApp (optional)</label>
+                <input type="text" id="whatsapp" placeholder="e.g. 27831234567" />
+              </div>
+              <div class="form-group">
+                <label for="instagram">Instagram (optional)</label>
+                <input type="text" id="instagram" placeholder="@yourhandle" />
+              </div>
+              <div class="form-group">
+                <label for="facebook">Facebook (optional)</label>
+                <input type="text" id="facebook" placeholder="Page link or name" />
+              </div>
+              <div class="ad-preview">
+                <h4>How it will look on the homepage</h4>
+                <p id="adPreviewSlotLabel">Featured placement</p>
+                <div id="homepageAdPreviewMount" class="homepage-ad-preview-mirror" aria-live="polite"></div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="advertiseSubmitBtn">Submit Tool</button>
+                <div id="successMessage" class="success-box" style="display:none; margin-top:12px;">
+                  Submitted successfully. We will review your ad.
+                </div>
+              </div>
+              <p id="advertiseError" class="review-form-message" style="color: #b91c1c; margin-top: 0.5rem;" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <p>© Auto Logbook SA</p>
+        <div class="footer-links">
+          <a href="index.html">Home</a>
+          <span class="footer-separator">•</span>
+          <a href="mailto:support@autologbooksa.co.za">Contact</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="/firebase/init.js"></script>
+  <script src="/js/ad-booking-shared.js"></script>
+  <script src="/js/advertise.js"></script>
+</body>
+</html>

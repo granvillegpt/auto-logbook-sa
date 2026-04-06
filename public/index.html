@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auto Logbook SA – Travel Logbook Generator</title>
+  <meta name="description" content="Create your travel logbook in minutes. Upload your route list and generate a structured logbook ready for review and submission." />
+  <meta property="og:title" content="Auto Logbook SA – Travel Logbook Generator" />
+  <meta property="og:description" content="Create your travel logbook in minutes. Upload your route list and generate a structured logbook ready for review and submission." />
+  <meta property="og:url" content="https://autologbook-sa.web.app/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://autologbook-sa.web.app/assets/logos/logo.png" />
+  <meta property="og:image:width" content="300" />
+  <meta property="og:image:height" content="300" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="fb:app_id" content="YOUR_FACEBOOK_APP_ID" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Auto Logbook SA – Travel Logbook Generator" />
+  <meta name="twitter:description" content="Create your travel logbook in minutes. Upload your route list and generate a structured logbook ready for review and submission." />
+  <meta name="twitter:image" content="https://autologbook-sa.web.app/assets/logos/logo.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="/assets/logos/favicon.ico" sizes="32x32">
+  <style>
+    #slotAdsFeatured {
+      margin-bottom: 24px;
+    }
+
+    #slotAdsFeatured .ad-card,
+    #slotAdsFeatured .ad-slot-card {
+      border: 1px solid #e5e7eb; /* light subtle border */
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04); /* soft shadow */
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    #slotAdsFeatured img {
+      width: 100%;
+      height: 260px; /* increase height */
+      object-fit: cover; /* keeps image clean, no stretch */
+      border-radius: 16px 16px 0 0;
+      display: block;
+    }
+
+    #slotAdsFeatured .ad-card img,
+    #slotAdsFeatured .ad-slot-card img {
+      height: 260px !important;
+      object-fit: cover;
+      width: 100%;
+      display: block;
+    }
+
+    #slotAdsFeatured .ad-card {
+      overflow: hidden;
+    }
+
+    /* Ensure image fills container */
+    #slotAdsFeatured .ad-slot-card img {
+      height: 100% !important;
+      width: 100%;
+      object-fit: cover;
+    }
+
+    #slotAdsFeatured .ad-slot-card .ad-image,
+    #slotAdsFeatured .ad-slot-card .image-wrapper {
+      height: 100% !important;
+    }
+
+    #slotAdsFeatured .tool-image.ad-image-wrapper {
+      height: 320px !important;
+      overflow: hidden;
+    }
+
+    #slotAdsFeatured .ad-image-main {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    #slotAdsFeatured .ad-slot-card {
+      height: auto !important;
+    }
+
+    .section-divider {
+      height: 60px;
+      background: #f8fafc;
+      border-top: 1px solid #e5e7eb;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    #recommended-tools-placement {
+      padding-top: 40px;
+      margin-top: 40px;
+    }
+
+    .review-card {
+      background: #f9fafb;
+      box-shadow: none;
+      border: 1px solid #e5e7eb;
+      opacity: 0.95;
+    }
+
+    #recommended-tools-placement .ad-slot-card {
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e5e7eb;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    #recommended-tools-placement .ad-slot-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    /* GLOBAL CARD ELEVATION */
+    .ad-slot-card,
+    .review-card,
+    .template-card,
+    .step-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    /* HOVER (only for clickable cards like ads) */
+    .ad-slot-card:hover {
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .section-divider {
+      height: 60px;
+      background: linear-gradient(to bottom, #ffffff, #f8fafc);
+    }
+
+    #what-users-say {
+      padding-bottom: 40px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    #slotAdsFeatured .ad-slot-card {
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    #recommended-tools-placement {
+      margin-top: 40px;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+  </style>
+</head>
+<body class="landing-page">
+  <header class="site-header site-header-landing">
+    <div class="container header-inner">
+      <a href="index.html" class="brand"><img src="assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
+      <nav class="site-nav">
+        <a href="#how-it-works">How it Works</a>
+        <a href="#templates">Templates</a>
+        <a href="#generate-logbook-section">Start Generating Your Logbook</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="landing-main">
+    <section class="hero">
+      <div class="container">
+        <div class="hero-inner">
+          <div class="hero-content">
+            <h1>Generate Your Travel Logbook in Minutes — Ready for Review</h1>
+            <p class="hero-subline">Generate travel logbooks aligned with SARS requirements, with a clean and editable workflow.</p>
+            <p class="hero-subtext">Always review and verify your logbook before submission.</p>
+            <div class="hero-buttons">
+              <a href="#generate-logbook-section" class="btn btn-primary">Start Generating Your Logbook</a>
+              <a href="#templates" class="btn btn-secondary">Templates & Example</a>
+            </div>
+            <p class="hero-note">✓ Designed around common SARS logbook requirements</p>
+            <p class="hero-note">✓ No subscriptions — generate logbooks when you need them</p>
+          </div>
+          <div class="hero-image">
+            <img src="assets/images/hero_image1.png" alt="Auto Logbook SA interface preview">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-grey landing-section problem-section" id="problem">
+      <div class="container">
+        <h2>Travel Logbooks Are Time-Consuming</h2>
+        <div class="problem-columns">
+          <div class="problem-column">
+            <h3>Manual Logbooks</h3>
+            <ul class="problem-list">
+              <li>Detailed trip records are required</li>
+              <li>Manual logbooks take time to prepare</li>
+              <li>Errors can create issues during review</li>
+            </ul>
+          </div>
+          <div class="problem-column problem-column-solution">
+            <h3>Auto Logbook SA</h3>
+            <ul class="problem-list">
+              <li>Routes generated automatically</li>
+              <li>Structured logbook created instantly</li>
+              <li>Ready for review and submission</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-grey landing-section" id="how-it-works">
+      <div class="container">
+        <h2 class="section-subhead">How It Works</h2>
+        <div class="how-cards">
+          <div class="how-card">
+            <div class="step-num">1</div>
+            <h3>Download Template</h3>
+            <p>Get the correct template for your travel type.</p>
+          </div>
+          <div class="how-card">
+            <div class="step-num">2</div>
+            <h3>Upload Visit List</h3>
+            <p>Upload your completed Excel visit list.</p>
+          </div>
+          <div class="how-card">
+            <div class="step-num">3</div>
+            <h3>Generate Logbook</h3>
+            <p>Download your structured travel logbook instantly.</p>
+          </div>
+        </div>
+        <div class="example-logbook-preview">
+          <a href="#generate-logbook-section" class="btn btn-primary">Start Generating Your Logbook</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-white landing-section" id="templates">
+      <div class="container">
+        <h2>Templates & Example Logbook</h2>
+        <p class="preview-subtext">Download the correct template for your travel type, then generate your logbook in minutes.</p>
+        <div class="template-instruction">
+          <h3 class="template-instruction-title">What Goes Into the Template</h3>
+          <div class="template-instruction-body">
+            <p class="template-instruction-text">List the locations you visit during your work week.</p>
+            <p class="template-instruction-text">The system calculates routes and formats your logbook automatically.</p>
+          </div>
+        </div>
+        <p class="template-instruction-text">Template downloads include a quick setup guide.</p>
+        <div class="how-cards template-cards">
+          <div class="how-card">
+            <h3>Sales Rep Route Template</h3>
+            <p>For sales representatives visiting multiple customers during the week. List your client visits and we’ll generate routes and the logbook.</p>
+            <a href="#" class="btn-outline" onclick="downloadTemplateWithGuide('sales_rep_route_template.xlsx'); return false;">Download Template</a>
+          </div>
+          <div class="how-card">
+            <h3>Basic Travel Template</h3>
+            <p>For contractors, consultants and professionals travelling to work locations. List sites you visit and we’ll format your travel logbook.</p>
+            <a href="#" class="btn-outline" onclick="downloadTemplateWithGuide('business_travel_template.xlsx'); return false;">Download Template</a>
+          </div>
+        </div>
+        <div class="example-logbook-preview">
+          <h3 class="section-subhead">Example Logbook</h3>
+          <p class="preview-subtext">See the format of a generated travel logbook before you create your own.</p>
+          <button type="button" class="btn btn-primary" id="openExampleLogbookBtn">View Example Logbook</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-grey landing-section benefits-section">
+      <div class="container">
+        <h2>Automated Travel Logbook Generation</h2>
+        <div class="feature-grid">
+          <div class="feature-item">
+            <h3>Automatic Route Generation</h3>
+            <p>Upload your visit list and generate structured travel routes automatically.</p>
+          </div>
+          <div class="feature-item">
+            <h3>Structured Travel Logbook</h3>
+            <p>Trips are formatted into a clear, submission-ready logbook.</p>
+          </div>
+          <div class="feature-item">
+            <h3>Built for Travel Claims</h3>
+            <p>Designed to align with common SARS logbook requirements.</p>
+          </div>
+          <div class="feature-item">
+            <h3>Excel Export</h3>
+            <p>Download your logbook in a clean, ready-to-use format.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-white reviews-section landing-section" id="what-users-say">
+      <div class="container">
+        <h2>What Users Say</h2>
+        <div id="reviewsList" class="reviews-grid"></div>
+        <div class="reviews-cta">
+          <h3>Enjoying Auto Logbook SA?</h3>
+          <button type="button" class="btn btn-primary" id="openReviewModalBtn">Leave a Review</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-divider"></div>
+
+    <section id="recommended-tools-placement" class="section section-white landing-section recommended-tools-placement hidden">
+      <div class="container">
+        <h2 class="section-title">Recommended Tools</h2>
+        <div id="slotAdsFeatured"></div>
+        <div class="slots-grid ad-slots-three-grid">
+          <div id="slotAdsSlot1" class="recommended-slot-column"></div>
+          <div id="slotAdsSlot2" class="recommended-slot-column"></div>
+          <div id="slotAdsSlot3" class="recommended-slot-column"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Review submission modal -->
+    <div class="modal-overlay" id="reviewModal" aria-hidden="true">
+      <div class="modal-box review-modal-box">
+        <button type="button" class="review-modal-close" id="closeReviewModal" aria-label="Close">×</button>
+        <h2>Leave a review</h2>
+        <form id="reviewForm" class="review-form">
+          <div class="review-form-row">
+            <label for="reviewName">Name (optional)</label>
+            <input type="text" id="reviewName" name="name" placeholder="Your name">
+          </div>
+          <div class="review-form-row">
+            <label for="reviewCompany">Company (optional)</label>
+            <input type="text" id="reviewCompany" name="company" placeholder="Company name">
+          </div>
+          <div class="review-form-row rating">
+            <span class="review-form-label">Rating</span>
+            <div class="star-rating" id="starRating" aria-label="Rate 1 to 5 stars">
+              <button type="button" class="star" data-value="1" aria-label="1 star">★</button>
+              <button type="button" class="star" data-value="2" aria-label="2 stars">★</button>
+              <button type="button" class="star" data-value="3" aria-label="3 stars">★</button>
+              <button type="button" class="star" data-value="4" aria-label="4 stars">★</button>
+              <button type="button" class="star" data-value="5" aria-label="5 stars">★</button>
+            </div>
+            <input type="hidden" id="reviewRating" name="rating" value="0">
+          </div>
+          <div class="review-form-row">
+            <label for="reviewComment">Comment</label>
+            <textarea id="reviewComment" name="comment" rows="3" placeholder="How did Auto Logbook SA help you prepare your travel logbook?" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Submit review</button>
+          <p class="review-note">Reviews may be displayed publicly on the Auto Logbook SA website.</p>
+        </form>
+        <p id="reviewFormMessage" class="review-form-message" aria-live="polite"></p>
+        <div class="review-success hidden" id="reviewSuccess">
+          <h3>Thank you for your review!</h3>
+          <p>We appreciate your feedback.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Example logbook preview modal -->
+    <div class="modal-overlay" id="exampleLogbookModal" aria-hidden="true">
+      <div class="modal-box">
+        <button type="button" class="review-modal-close" id="closeExampleLogbookModal" aria-label="Close">×</button>
+        <h2>Example Logbook</h2>
+        <p class="preview-subtext">Preview of a generated Auto Logbook SA report.</p>
+        <p class="preview-subtext">Exported logbooks are provided in Excel format so you can review, edit, or style them if needed.</p>
+        <div class="example-logbook-iframe-wrap">
+          <iframe
+            id="pdfPreview"
+            class="example-logbook-iframe"
+            src="templates/example-logbook.pdf#page=1&view=FitH&toolbar=0">
+          </iframe>
+        </div>
+      </div>
+    </div>
+
+    <section class="section section-grey pricing-section" id="generate-logbook-section">
+      <div class="container">
+        <div class="premium-wrapper">
+        <div class="premium-card">
+          <div class="premium-card-badge">Premium Access</div>
+          <h2 id="paywallTitle" class="premium-card-title">Generate Your Logbook</h2>
+          <p class="premium-card-subtext">
+            Generate travel logbooks aligned with SARS requirements.
+          </p>
+          <ul class="premium-card-features">
+            <li>✔ Accurate mileage calculations</li>
+            <li>✔ Fully editable before export</li>
+            <li>✔ Excel-ready download</li>
+            <li>✔ Token-based access for repeat use</li>
+          </ul>
+          <p id="priceText" class="premium-card-price">R600 per logbook</p>
+          <p id="tokenAllowanceText" class="premium-card-footer">Each logbook includes 3 download tokens</p>
+          <div class="premium-card-footer">Select number of logbooks</div>
+          <div id="purchaseRow" style="display:flex; gap:10px; width:100%;">
+            <input id="logbookQty" type="number" min="1" value="1" class="form-input" style="flex:0 0 80px; width:80px; max-width:80px; min-width:80px; padding:8px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
+            <input id="couponCode" type="text" placeholder="Coupon code (optional)" class="form-input" style="flex:1 1 auto; width:auto; max-width:none; min-width:0; padding:8px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
+          </div>
+          <div class="premium-card-footer">Enter your email address</div>
+          <input id="paymentEmail" type="email" placeholder="you@email.com" class="form-input" style="display:block; width:100%; max-width:none; min-width:0; padding:8px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
+          <div id="checkoutTotal" class="premium-card-price">Total: R600</div>
+          <button id="unlockLogbookBtn" class="btn btn-primary">Pay &amp; Generate Logbook</button>
+          <p class="premium-card-footer">
+            Your access link will be emailed to you after payment.
+          </p>
+        </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="advertise-section">
+      <div class="container">
+        <div class="dashboard-card advertise-card">
+          <h3>Promote Your Tool to Auto Logbook SA Users</h3>
+          <p>
+            Reach drivers, contractors, and sales representatives preparing travel logbooks aligned with SARS requirements.
+            Promote your product directly inside the tools section used by our users.
+          </p>
+          <a href="advertise.html" class="btn btn-primary advertise-btn" id="placeAdBtn">
+            Place Ad
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('placeAdBtn') || document.querySelector('.advertise-btn');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        console.log('Place Ad clicked — navigating to advertise flow');
+      });
+    })();
+  </script>
+
+  <div class="payment-strip">
+    <div class="payment-strip-payfast">
+      <p class="payment-platform">Secure checkout via</p>
+      <img class="payfast-logo" src="assets/payment/Payfast logo.png" alt="PayFast">
+    </div>
+    <div class="payment-strip-methods">
+      <p class="payment-methods-label">Supported payment methods</p>
+      <div class="payment-logos">
+        <img src="assets/payment/Visa.png" alt="Visa">
+        <img src="assets/payment/Master Card.png" alt="Mastercard">
+        <img src="assets/payment/Capitec Pay - colour.png" alt="Capitec Pay">
+        <img src="assets/payment/instantEFT_hi-Res_logo_png.png" alt="Instant EFT">
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+      <p>© Auto Logbook SA</p>
+
+      <div class="footer-links">
+        <a href="#" id="openPrivacyFooter">Privacy</a>
+        <span class="footer-separator">•</span>
+        <a href="#" id="openTermsFooter">Terms</a>
+        <span class="footer-separator">•</span>
+        <a href="#" id="openRefundPolicyFooter">Refund Policy</a>
+        <span class="footer-separator">•</span>
+        <a href="#" id="openDisclaimerFooter">Disclaimer</a>
+        <span class="footer-separator">•</span>
+        <a href="mailto:support@autologbooksa.co.za">Contact</a>
+      </div>
+
+      <p class="engine">Powered by ClearTrack Logbook Engine</p>
+      <p class="footer-legal">Auto Logbook SA is an independent tool designed to assist with SARS travel logbook record-keeping. It is not affiliated with or endorsed by the South African Revenue Service (SARS). Users are responsible for reviewing and confirming the accuracy of their logbook before submission.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="disclaimerModal" aria-hidden="true">
+    <div class="modal-box modal-content">
+      <h2>Important Disclaimer</h2>
+      <p>Auto Logbook SA provides software tools that assist users in generating vehicle travel logbooks based on information supplied by the user. The user remains solely responsible for ensuring that all information is accurate, complete, and compliant with SARS requirements. Auto Logbook SA does not guarantee acceptance of any logbook by the South African Revenue Service (SARS).</p>
+      <p>The software and information provided by Auto Logbook SA are intended for record-keeping purposes only and do not constitute tax, legal, or financial advice.</p>
+      <p>The user is responsible for ensuring that all trips, distances, dates, and travel purposes recorded in the logbook accurately reflect actual travel undertaken.</p>
+      <p>Distances and route calculations are generated using mapping services and may contain estimation errors. Users should review and confirm all generated information before relying on it for tax purposes.</p>
+      <p>Auto Logbook SA relies on information entered by the user as well as data provided by third-party services, including mapping and routing providers. The accuracy of generated logbooks depends on the completeness and correctness of the information supplied by the user and the availability of third-party services. Auto Logbook SA does not guarantee the accuracy, completeness, or suitability of generated distances, routes, or logbook entries. Users must review and verify all generated information before using it for tax or record-keeping purposes.</p>
+      <p>Auto Logbook SA is an independent software tool and is not affiliated with, endorsed by, or approved by the South African Revenue Service (SARS).</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary modal-close">I Understand</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="termsModal" aria-hidden="true">
+    <div class="modal-box modal-content">
+      <h2>Terms of Use</h2>
+      <p>By using Auto Logbook SA you agree to use the tool for personal or professional logbook generation only. You are responsible for the accuracy of data you enter and for compliance with SARS and local tax rules. This tool is provided as-is without warranty.</p>
+      <p>The software and information provided by Auto Logbook SA are intended for record-keeping purposes only and do not constitute tax, legal, or financial advice.</p>
+      <p>The user is responsible for ensuring that all trips, distances, dates, and travel purposes recorded in the logbook accurately reflect actual travel undertaken.</p>
+      <p>Auto Logbook SA is an independent software tool and is not affiliated with, endorsed by, or approved by the South African Revenue Service (SARS).</p>
+      <p>Distances and route calculations are generated using mapping services and may contain estimation errors. Users should review and confirm all generated information before relying on it for tax purposes.</p>
+      <p>Auto Logbook SA relies on information entered by the user as well as data provided by third-party services, including mapping and routing providers. The accuracy of generated logbooks depends on the completeness and correctness of the information supplied by the user and the availability of third-party services. Auto Logbook SA does not guarantee the accuracy, completeness, or suitability of generated distances, routes, or logbook entries. Users must review and verify all generated information before using it for tax or record-keeping purposes.</p>
+      <p>To the maximum extent permitted by law, Auto Logbook SA shall not be liable for any tax assessments, penalties, financial losses, or damages arising from the use of this software.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="privacyModal" aria-hidden="true">
+    <div class="modal-box modal-content">
+      <h2>Privacy Policy</h2>
+      <p>Uploaded route lists are processed locally in your browser. No data is sent to any server or stored by us. Auto Logbook SA does not collect personal information.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary modal-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script type="module" src="js/reviews.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="/firebase/init.js"></script>
+  <script src="/js/firebase-init.js"></script>
+  <script>
+    (function () {
+      var fallbackPrice = 699;
+      var pricePerPack = fallbackPrice;
+      var priceTextEl = document.getElementById('priceText');
+      var tokenTextEl = document.getElementById('tokenAllowanceText');
+      var qtyEl = document.getElementById('logbookQty');
+      var couponEl = document.getElementById('couponCode');
+      var emailEl = document.getElementById('paymentEmail');
+      var totalEl = document.getElementById('checkoutTotal');
+      var unlockBtn = document.getElementById('unlockLogbookBtn');
+
+      function setPriceText() {
+        if (priceTextEl) priceTextEl.textContent = 'R' + Number(pricePerPack) + ' per logbook';
+        if (tokenTextEl) tokenTextEl.textContent = 'Each logbook includes 3 download tokens';
+      }
+
+      async function updateCheckoutTotal() {
+        if (!qtyEl || !totalEl) return Number(pricePerPack);
+        var qty = Number(qtyEl.value) || 1;
+        if (qty < 1) qty = 1;
+        qty = Math.floor(qty);
+
+        var total = Number(pricePerPack) * qty;
+        var coupon = couponEl ? String(couponEl.value || '').trim().toUpperCase() : '';
+        if (coupon && window.db) {
+          try {
+            var doc = await window.db.collection('coupons').doc(coupon).get();
+            if (doc.exists) {
+              var data = doc.data() || {};
+              if (data.active) {
+                if (data.type === 'percent') total = total * (1 - (Number(data.value) || 0) / 100);
+                else if (data.type === 'fixed') total = total - Number(data.value || 0);
+              }
+            }
+          } catch (e) {
+            console.warn('Coupon lookup failed', e);
+          }
+        }
+        if (total < 0) total = 0;
+        total = Math.round(total * 100) / 100;
+        totalEl.textContent = 'Total: R' + Math.round(total);
+        return total;
+      }
+
+      async function loadFrontendPricing() {
+        try {
+          if (window.db) {
+            var doc = await window.db.collection('pricing').doc('default').get();
+            if (doc.exists) {
+              var data = doc.data() || {};
+              var logbook = data.tools && data.tools.logbook ? data.tools.logbook : null;
+              var rawPrice = Number(logbook && logbook.price);
+              if (Number.isFinite(rawPrice) && rawPrice > 0) pricePerPack = rawPrice;
+            }
+          }
+        } catch (err) {
+          console.error('Pricing load failed:', err);
+        }
+        setPriceText();
+        await updateCheckoutTotal();
+      }
+
+      function uniquePaymentId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 12);
+      }
+
+      function initPremiumCheckout(root) {
+        root = root || document;
+        var q = root.querySelector('#logbookQty');
+        var c = root.querySelector('#couponCode');
+        var e = root.querySelector('#paymentEmail');
+        var t = root.querySelector('#checkoutTotal');
+        var b = root.querySelector('#unlockLogbookBtn');
+        if (!q || !c || !e || !t || !b) return;
+        q.addEventListener('input', updateCheckoutTotal);
+        q.addEventListener('change', updateCheckoutTotal);
+        c.addEventListener('input', updateCheckoutTotal);
+        c.addEventListener('change', updateCheckoutTotal);
+        b.addEventListener('click', async function (evt) {
+          evt.preventDefault();
+          var qty = Number(q.value) || 1;
+          if (qty < 1) qty = 1;
+          qty = Math.floor(qty);
+          var email = String(e.value || '').trim();
+          if (!email) {
+            alert('Please enter your email');
+            return;
+          }
+          try {
+            localStorage.setItem('userEmail', email);
+          } catch (_e) {}
+          var coupon = String(c.value || '').trim().toUpperCase();
+          var amount = await updateCheckoutTotal();
+          var paymentId = uniquePaymentId();
+          var tokens = qty * 3;
+          var url = '/pay.html?product=logbook' +
+            '&amount=' + encodeURIComponent(amount) +
+            '&custom_str1=' + encodeURIComponent(paymentId) +
+            '&email=' + encodeURIComponent(email) +
+            '&tokens=' + encodeURIComponent(tokens);
+          if (coupon) url += '&coupon=' + encodeURIComponent(coupon);
+          window.location.href = url;
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+          initPremiumCheckout(document);
+          loadFrontendPricing();
+        });
+      } else {
+        initPremiumCheckout(document);
+        loadFrontendPricing();
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      var IS_DEV =
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1';
+      var section = document.getElementById('recommended-tools-placement');
+      var featuredEl = document.getElementById('slotAdsFeatured');
+      var slot1El = document.getElementById('slotAdsSlot1');
+      var slot2El = document.getElementById('slotAdsSlot2');
+      var slot3El = document.getElementById('slotAdsSlot3');
+      console.log('[ADS] IS_DEV:', IS_DEV);
+      console.log('[ADS] ADS CONTAINER section:', section, 'featured:', featuredEl, 'slot1:', slot1El, 'slot2:', slot2El, 'slot3:', slot3El);
+      if (!section || !featuredEl || !slot1El || !slot2El || !slot3El) {
+        console.warn('[ADS] Missing DOM nodes — aborting recommended-tools loader');
+        return;
+      }
+
+      window.wireAdImageBackgrounds = function (root) {
+        if (!root || !root.querySelectorAll) return;
+        var nodes = root.querySelectorAll('.ad-image-wrapper');
+        for (var wi = 0; wi < nodes.length; wi++) {
+          var wrap = nodes[wi];
+          var main = wrap.querySelector('.ad-image-main');
+          var bg = wrap.querySelector('.ad-image-bg');
+          if (main && bg && main.src) {
+            bg.style.backgroundImage = 'url(' + JSON.stringify(main.src) + ')';
+            bg.style.backgroundPosition = main.style.objectPosition || '50% 50%';
+          }
+        }
+      };
+
+      function showSection() { section.classList.remove('hidden'); }
+      function hideSection() { section.classList.add('hidden'); }
+
+      function escapeHtml(str) {
+        if (str == null) return '';
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      var DEFAULT_AD_IMAGE = '/assets/default-ad.png';
+      function resolvedAdImageSrc(ad) {
+        var fromImage = ad.image && String(ad.image).trim();
+        var imageSrc = fromImage ? fromImage : DEFAULT_AD_IMAGE;
+        if (imageSrc !== DEFAULT_AD_IMAGE) return imageSrc;
+        var fromLogo = ad.logo && String(ad.logo).trim();
+        return fromLogo ? fromLogo : DEFAULT_AD_IMAGE;
+      }
+
+      function payloadForSlotModal(t) {
+        var website = (t.website && String(t.website).trim()) || (t.url && String(t.url).trim()) || '';
+        var ipT = t.imagePosition;
+        var px = ipT && ipT.x != null ? ipT.x : t.positionX;
+        var py = ipT && ipT.y != null ? ipT.y : t.positionY;
+        return {
+          name: (t.toolName && t.toolName.trim()) || '',
+          logo: resolvedAdImageSrc(t),
+          type: 'ad',
+          description: (t.description && String(t.description).trim()) || '',
+          phone: t.phone || '',
+          whatsapp: t.whatsapp || '',
+          instagram: t.instagram || '',
+          facebook: t.facebook || '',
+          website: website,
+          companyName: (t.companyName && String(t.companyName).trim()) || '',
+          positionX: px,
+          positionY: py
+        };
+      }
+
+      function buildAdImageBlock(imgSrc, toolNameEsc, posX, posY) {
+        var esc = escapeHtml(imgSrc);
+        var x = Number(posX);
+        var y = Number(posY);
+        if (!isFinite(x)) x = 50;
+        if (!isFinite(y)) y = 50;
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+        return (
+          '<div class="tool-image ad-image-wrapper">' +
+          '<div class="ad-image-bg"></div><img class="ad-image-main" src="' +
+          esc +
+          '" alt="' +
+          toolNameEsc +
+          '" style="object-fit:cover;object-position:' + x + '% ' + y + '%;"></div>'
+        );
+      }
+
+      function renderSlotAd(ad) {
+        var toolNameEsc = escapeHtml((ad.toolName && ad.toolName.trim()) ? ad.toolName.trim() : '');
+        var descRaw = (ad.description && String(ad.description).trim()) ? String(ad.description).trim() : '';
+        var descShort = descRaw.length > 140 ? descRaw.slice(0, 137) + '\u2026' : descRaw;
+        var descEsc = descRaw ? escapeHtml(descShort) : '';
+        var imgSrc = resolvedAdImageSrc(ad);
+        return (
+          '<div class="slot-card ad-slot-card ad-slot-filled" data-tool-id="' + escapeHtml(ad.id) + '">' +
+          buildAdImageBlock(imgSrc, toolNameEsc, ad.positionX, ad.positionY) +
+          '<div class="ad-slot-filled-body">' +
+          '<h3 class="ad-slot-title">' + toolNameEsc + '</h3>' +
+          (descEsc ? '<p class="ad-slot-desc">' + descEsc + '</p>' : '') +
+          '<button class="secondary-btn ad-slot-view-btn" type="button">View</button>' +
+          '</div>' +
+          '</div>'
+        );
+      }
+
+      /** Bucket: top/featured→featured row, mid/slot1→column 1, slot2→2, slot3→3 */
+      function displayCanonFromDoc(data) {
+        var sk = (data && data.slot != null ? String(data.slot) : '').toLowerCase().replace(/\s+/g, '').trim();
+        if (sk === 'top' || sk === 'featured') return 'featured';
+        if (sk === 'mid' || sk === 'slot1') return 'slot1';
+        if (sk === 'bottom' || sk === 'slot2') return 'slot2';
+        if (sk === 'slot3') return 'slot3';
+        return '';
+      }
+
+      function wireGridClicks(tools, root, db) {
+        var cards = root.querySelectorAll('.ad-slot-card');
+        for (var i = 0; i < tools.length; i++) {
+          if (!cards[i]) continue;
+          (function (tool, el) {
+            el.onclick = function () {
+              var payload = payloadForSlotModal(tool);
+              var safeWebsite = (typeof window.safeWebsiteUrl === 'function') ? window.safeWebsiteUrl(payload.website) : '';
+              if (safeWebsite) {
+                db.collection('sponsoredTools').doc(tool.id).update({ clicks: firebase.firestore.FieldValue.increment(1) })
+                  .catch(function () {})
+                  .then(function () { window.open(safeWebsite, '_blank'); });
+                return;
+              }
+              if (typeof window.openToolModal === 'function') window.openToolModal(payload);
+            };
+          })(tools[i], cards[i]);
+        }
+      }
+
+      if (!window.db) {
+        console.warn('[ADS] window.db missing — cannot load sponsoredTools');
+        hideSection();
+        return;
+      }
+      var db = window.db;
+
+      var adsQuery = IS_DEV
+        ? db.collection('sponsoredTools').where('status', 'in', ['live', 'approved'])
+        : db.collection('sponsoredTools').where('status', '==', 'live');
+      console.log(
+        '[ADS] Query:',
+        IS_DEV ? "where status in ['live','approved'] (DEV)" : "where status == 'live'"
+      );
+
+      adsQuery
+        .get()
+        .then(function (snap) {
+          console.log('[ADS] RAW SNAPSHOT size:', snap.size);
+          console.log(
+            '[ADS] RAW SNAPSHOT:',
+            snap.docs.map(function (d) {
+              var x = d.data() || {};
+              return {
+                id: d.id,
+                status: x.status,
+                slot: x.slot,
+                toolName: x.toolName || x.title
+              };
+            })
+          );
+          var featuredAds = [];
+          var slot1Ads = [];
+          var slot2Ads = [];
+          var slot3Ads = [];
+          snap.forEach(function (doc) {
+            var data = doc.data() || {};
+            var slot = displayCanonFromDoc(data);
+            console.log('[ADS] AD FILTER CHECK:', {
+              id: doc.id,
+              status: data.status,
+              slot: data.slot,
+              canon: slot || '(no slot match — row skipped)'
+            });
+            if (!slot) return;
+            var ip = data.imagePosition;
+            var posXRow = ip && ip.x != null ? Number(ip.x) : data.positionX;
+            var posYRow = ip && ip.y != null ? Number(ip.y) : data.positionY;
+            var row = {
+              id: doc.id,
+              toolName: data.toolName || data.title,
+              description: data.description,
+              logo: data.logo,
+              image: data.image,
+              website: data.website,
+              url: data.url,
+              phone: data.phone,
+              whatsapp: data.whatsapp,
+              instagram: data.instagram,
+              facebook: data.facebook,
+              companyName: data.companyName,
+              positionX: posXRow,
+              positionY: posYRow,
+              imagePosition: ip || null
+            };
+            if (slot === 'featured') {
+              featuredAds.push(row);
+            } else if (slot === 'slot1') {
+              slot1Ads.push(row);
+            } else if (slot === 'slot2') slot2Ads.push(row);
+            else if (slot === 'slot3') slot3Ads.push(row);
+          });
+          console.log('[ADS] ADS ARRAY LENGTHS:', {
+            featured: featuredAds.length,
+            slot1: slot1Ads.length,
+            slot2: slot2Ads.length,
+            slot3: slot3Ads.length
+          });
+          if (
+            featuredAds.length === 0 &&
+            slot1Ads.length === 0 &&
+            slot2Ads.length === 0 &&
+            slot3Ads.length === 0
+          ) {
+            console.warn('[ADS] No rows in any slot after slot mapping — hiding section');
+            hideSection();
+            return;
+          }
+          if (featuredAds.length > 0) {
+            featuredEl.innerHTML = renderSlotAd(featuredAds[0]);
+          } else {
+            featuredEl.innerHTML =
+              '<div class="ad-card placeholder"><p>advertise here</p></div>';
+          }
+          slot1El.innerHTML = slot1Ads.length ? slot1Ads.map(renderSlotAd).join('') : '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
+          slot2El.innerHTML = slot2Ads.length ? slot2Ads.map(renderSlotAd).join('') : '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
+          slot3El.innerHTML = slot3Ads.length ? slot3Ads.map(renderSlotAd).join('') : '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
+          if (typeof window.wireAdImageBackgrounds === 'function') {
+            window.wireAdImageBackgrounds(featuredEl);
+            window.wireAdImageBackgrounds(slot1El);
+            window.wireAdImageBackgrounds(slot2El);
+            window.wireAdImageBackgrounds(slot3El);
+          }
+          if (featuredAds.length > 0) {
+            wireGridClicks([featuredAds[0]], featuredEl, db);
+            db.collection('sponsoredTools').doc(featuredAds[0].id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
+          }
+          wireGridClicks(slot1Ads, slot1El, db);
+          wireGridClicks(slot2Ads, slot2El, db);
+          wireGridClicks(slot3Ads, slot3El, db);
+          slot1Ads.forEach(function (t) {
+            db.collection('sponsoredTools').doc(t.id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
+          });
+          slot2Ads.forEach(function (t) {
+            db.collection('sponsoredTools').doc(t.id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
+          });
+          slot3Ads.forEach(function (t) {
+            db.collection('sponsoredTools').doc(t.id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
+          });
+          showSection();
+          console.log('[ADS] Recommended Tools section shown');
+        })
+        .catch(function (err) {
+          console.error('[ADS] sponsoredTools query failed:', err);
+          hideSection();
+        });
+    })();
+  </script>
+  <script>
+    function downloadTemplateWithGuide(templateFile) {
+      var templatePath = '/templates/' + templateFile;
+      var guidePath = '/templates/route_template_guide.pdf';
+      var link1 = document.createElement('a');
+      link1.href = templatePath;
+      link1.download = templateFile;
+      document.body.appendChild(link1);
+      link1.click();
+      document.body.removeChild(link1);
+      setTimeout(function () {
+        var link2 = document.createElement('a');
+        link2.href = guidePath;
+        link2.download = 'route_template_guide.pdf';
+        document.body.appendChild(link2);
+        link2.click();
+        document.body.removeChild(link2);
+      }, 400);
+    }
+  </script>
+  <script>
+    (function () {
+      var openExampleBtn = document.getElementById('openExampleLogbookBtn');
+      var closeExampleBtn = document.getElementById('closeExampleLogbookModal');
+      var exampleModal = document.getElementById('exampleLogbookModal');
+      if (openExampleBtn && exampleModal) openExampleBtn.addEventListener('click', function () { window._lastModalOpener = document.activeElement; exampleModal.classList.add('is-open'); exampleModal.setAttribute('aria-hidden', 'false'); });
+      if (closeExampleBtn && exampleModal) closeExampleBtn.addEventListener('click', function () { exampleModal.classList.remove('is-open'); exampleModal.setAttribute('aria-hidden', 'true'); if (window._lastModalOpener && typeof window._lastModalOpener.focus === 'function') { window._lastModalOpener.focus(); window._lastModalOpener = null; } });
+      if (exampleModal) exampleModal.addEventListener('click', function (e) { if (e.target === exampleModal) { exampleModal.classList.remove('is-open'); exampleModal.setAttribute('aria-hidden', 'true'); if (window._lastModalOpener && typeof window._lastModalOpener.focus === 'function') { window._lastModalOpener.focus(); window._lastModalOpener = null; } } });
+    })();
+  </script>
+  <div id="toolModal" class="tool-modal hidden">
+    <div class="tool-modal-overlay"></div>
+    <div class="tool-modal-content">
+      <button type="button" id="toolModalClose" aria-label="Close">&times;</button>
+      <div id="toolModalBody"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      function escapeHtmlModal(str) {
+        if (str == null) return '';
+        var div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+      }
+      function safeWebsiteUrl(url) {
+        if (!url || typeof url !== 'string') return '';
+        var u = url.trim();
+        if (/^https?:\/\//i.test(u)) return u;
+        if (/^\/\//.test(u)) return 'https:' + u;
+        if (/^www\./i.test(u)) return 'https://' + u;
+        return '';
+      }
+      window.safeWebsiteUrl = safeWebsiteUrl;
+      window.openToolModal = function (t) {
+        var modal = document.getElementById('toolModal');
+        var body = document.getElementById('toolModalBody');
+        if (!modal || !body) return;
+        var logo = t.logo && String(t.logo).trim();
+        var ipM = t.imagePosition;
+        var posX = Number(ipM && ipM.x != null ? ipM.x : t.positionX);
+        var posY = Number(ipM && ipM.y != null ? ipM.y : t.positionY);
+        if (!isFinite(posX)) posX = 50;
+        if (!isFinite(posY)) posY = 50;
+        posX = Math.max(0, Math.min(100, posX));
+        posY = Math.max(0, Math.min(100, posY));
+        var imageBlock = logo
+          ? '<div class="ad-image-wrapper"><div class="ad-image-bg"></div><img class="ad-image-main" src="' +
+            escapeHtmlModal(logo) +
+            '" alt="" style="object-fit:cover;object-position:' + posX + '% ' + posY + '%;"></div>'
+          : '<div class="no-image">No Image</div>';
+        var badgeText = t.type === 'tool' ? 'Tool' : 'Sponsored';
+        var nameEscaped = escapeHtmlModal(t.name || 'Untitled');
+        var descEscaped = escapeHtmlModal(t.description || 'No description provided.');
+        var companyName = (t.companyName && String(t.companyName).trim()) || '';
+        var companyHtml = companyName
+          ? '<p><strong>Company:</strong> ' + escapeHtmlModal(companyName) + '</p>'
+          : '';
+        var phoneHtml = t.phone
+          ? '<p><strong>Phone:</strong> ' + escapeHtmlModal(t.phone) + '</p>'
+          : '';
+        var whatsappClean = t.whatsapp ? String(t.whatsapp).replace(/\D/g, '') : '';
+        var instagramClean = t.instagram ? String(t.instagram).replace('@', '').trim() : '';
+        var facebookHref = t.facebook ? String(t.facebook).trim() : '';
+        var web = safeWebsiteUrl(t.website);
+        var actionsHtml = (whatsappClean || instagramClean || facebookHref || web)
+          ? '<div class="tool-actions">' +
+              (whatsappClean
+                ? '<a href="https://wa.me/' + escapeHtmlModal(whatsappClean) + '" target="_blank" class="tool-btn whatsapp" rel="noopener"><img src="/assets/icons/icons8-whatsapp-50.svg" alt="WhatsApp"></a>'
+                : '') +
+              (instagramClean
+                ? '<a href="https://instagram.com/' + escapeHtmlModal(instagramClean) + '" target="_blank" class="tool-btn instagram" rel="noopener"><img src="/assets/icons/icons8-instagram-50.svg" alt="Instagram"></a>'
+                : '') +
+              (facebookHref
+                ? '<a href="' + escapeHtmlModal(facebookHref) + '" target="_blank" class="tool-btn facebook" rel="noopener"><img src="/assets/icons/icons8-facebook-50.svg" alt="Facebook"></a>'
+                : '') +
+              (web
+                ? '<a href="' + escapeHtmlModal(web) + '" target="_blank" class="tool-btn website" rel="noopener">Visit Website</a>'
+                : '') +
+            '</div>'
+          : '';
+        body.innerHTML =
+          '<div class="tool-modal-grid">' +
+          '<div class="tool-modal-image">' + imageBlock + '</div>' +
+          '<div class="tool-modal-info tool-modal-right">' +
+          '<div class="tool-badge">' + escapeHtmlModal(badgeText) + '</div>' +
+          '<h2>' + nameEscaped + '</h2>' +
+          '<p class="tool-desc">' + descEscaped + '</p>' +
+          companyHtml +
+          phoneHtml +
+          actionsHtml +
+          '</div></div>';
+        modal.classList.remove('hidden');
+        var wrap = body.querySelector('.tool-modal-image .ad-image-wrapper');
+        if (wrap) {
+          var main = wrap.querySelector('.ad-image-main');
+          var bg = wrap.querySelector('.ad-image-bg');
+          if (main && bg && main.src) bg.style.backgroundImage = 'url(' + JSON.stringify(main.src) + ')';
+        }
+      };
+      var closeBtn = document.getElementById('toolModalClose');
+      var modalEl = document.getElementById('toolModal');
+      var overlay = document.querySelector('.tool-modal-overlay');
+      if (closeBtn && modalEl) {
+        closeBtn.onclick = function () {
+          modalEl.classList.add('hidden');
+        };
+      }
+      if (overlay && modalEl) {
+        overlay.onclick = function () {
+          modalEl.classList.add('hidden');
+        };
+      }
+    })();
+  </script>
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        const href = this.getAttribute('href');
+        if (!href || href === '#') return;
+        const target = document.querySelector(href);
+        if (!target) return;
+
+        e.preventDefault();
+
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      });
+    });
+  </script>
+</body>
+</html>

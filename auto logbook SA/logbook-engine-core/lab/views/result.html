@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logbook Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .totals {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .totals pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+        }
+        .actions {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0b7dda;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .leave-row {
+            background-color: #e8f4ff; /* very soft blue */
+        }
+        .holiday-row {
+            background-color: #fff8e1; /* soft amber */
+        }
+        .nonwork-row {
+            background-color: #f5f5f5; /* light grey */
+        }
+        .office-row {
+            background-color: #e3f2fd; /* soft blue */
+        }
+        .colleague-row {
+            background-color: #f3e5f5; /* soft purple */
+        }
+        .meta {
+            color: #666;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Logbook Results</h1>
+        
+        <div id="error" style="display: {{hasError}} === 'true' ? 'block' : 'none';" class="error">
+            {{error}}
+        </div>
+
+        <div id="success" style="display: {{hasError}} === 'false' ? 'block' : 'none';">
+            <div class="meta" style="background-color: #e3f2fd; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                <strong>Taxpayer:</strong> <span id="taxpayerName"></span><br>
+                <strong>Vehicle:</strong> <span id="vehicleInfo"></span><br>
+                <strong>Tax Year:</strong> <span id="taxYear"></span><br>
+                <strong>Period:</strong> <span id="period"></span>
+            </div>
+
+            <div class="meta">
+                <strong>Total Entries:</strong> {{totalEntries}} | 
+                <strong>Displaying:</strong> {{displayCount}}
+            </div>
+
+            {{warnings}}
+
+            <div class="totals">
+                <h3>Totals</h3>
+                <pre>{{totals}}</pre>
+            </div>
+
+            <div class="meta">
+                <h3>Metadata</h3>
+                <pre>{{meta}}</pre>
+            </div>
+
+            <div class="actions">
+                <h3>Download</h3>
+                <a href="/download/{{runId}}.csv"><button>Download CSV</button></a>
+                <a href="/download/{{runId}}.xlsx"><button>Download XLSX</button></a>
+                <a href="/download/{{runId}}.pdf"><button>Download PDF</button></a>
+            </div>
+
+            <div>
+                <h3>Logbook Entries (First 50)</h3>
+                {{entriesTable}}
+            </div>
+
+            <div style="margin-top: 30px;">
+                <a href="/">← Generate Another Logbook</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

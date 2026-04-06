@@ -1,0 +1,24 @@
+{
+  "name": "Auto Logbook SA – Admin",
+  "short_name": "Logbook Admin",
+  "description": "Review moderation for Auto Logbook SA",
+  "start_url": "/admin/reviews.html",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#0b7285",
+  "theme_color": "#0b7285",
+  "icons": [
+    {
+      "src": "/assets/logos/favicon.ico",
+      "sizes": "32x32",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logos/favicon.ico",
+      "sizes": "192x192",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ]
+}

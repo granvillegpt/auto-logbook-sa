@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auto Logbook SA – Logbook Generator</title>
+  <meta property="og:title" content="Auto Logbook SA – Logbook Generator" />
+  <meta property="og:description" content="Generate a SARS-compliant vehicle logbook in minutes." />
+  <meta property="og:url" content="https://autologbook-sa.web.app/logbook.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://autologbook-sa.web.app/assets/logos/logo.png" />
+  <meta property="og:image:width" content="300" />
+  <meta property="og:image:height" content="300" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="fb:app_id" content="YOUR_FACEBOOK_APP_ID" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Auto Logbook SA – Logbook Generator" />
+  <meta name="twitter:description" content="Generate a SARS-compliant vehicle logbook in minutes." />
+  <meta name="twitter:image" content="https://autologbook-sa.web.app/assets/logos/logo.png" />
+  <link rel="icon" type="image/png" href="assets/logos/auto_logbook_favicon-white.png">
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/logbook-page.css" />
+</head>
+<body>
+  <header class="site-header site-header-landing">
+    <div class="container header-inner">
+      <a href="index.html" class="brand"><img src="assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
+      <nav class="site-nav">
+        <a href="index.html">Home</a>
+        <a href="index.html#how-it-works">How it Works</a>
+        <a href="index.html#templates">Templates</a>
+      </nav>
+    </div>
+  </header>
+  <script>
+    (function () {
+      var base = 'https://autologbook-sa.web.app/logbook.html';
+      var shareUrl = base + '?v=2';
+      var btn = document.getElementById('copy-share-link-btn');
+      if (btn) {
+        btn.addEventListener('click', function () {
+          try {
+            navigator.clipboard.writeText(shareUrl).then(function () {
+              var t = btn.textContent;
+              btn.textContent = 'Copied!';
+              setTimeout(function () { btn.textContent = t; }, 2000);
+            });
+          } catch (e) {
+            btn.textContent = 'Copy link';
+          }
+        });
+      }
+    })();
+  </script>
+
+  <main>
+  <div id="logbookContent" class="logbook-content-root" style="display:block;">
+  <div class="page-container">
+  <div id="mobile-block-message" class="hidden">
+    <h2>Desktop or Tablet Required</h2>
+    <p>
+      Auto Logbook SA works best on a larger screen.
+      Please open this page on a desktop or tablet to generate your logbook.
+    </p>
+  </div>
+  <div id="logbook-desktop-container">
+  <div class="tool-container">
+    <div class="step-progress" role="list" aria-label="Progress">
+      <div class="step-progress-inner">
+        <div class="step-item" id="stepProgress1" data-step="1" role="listitem">
+          <span class="step-circle" aria-hidden="true">1</span>
+          <span class="step-label">Upload Routes</span>
+        </div>
+        <div class="step-connector" aria-hidden="true"></div>
+        <div class="step-item" id="stepProgress2" data-step="2" role="listitem">
+          <span class="step-circle" aria-hidden="true">2</span>
+          <span class="step-label">Logbook Details</span>
+        </div>
+        <div class="step-connector" aria-hidden="true"></div>
+        <div class="step-item" id="stepProgress3" data-step="3" role="listitem">
+          <span class="step-circle" aria-hidden="true">3</span>
+          <span class="step-label">Generate Logbook</span>
+        </div>
+      </div>
+    </div>
+<div class="routelist-wrapper routelist-wrapper--step1">
+  <div class="routelist-card routelist-card--routes">
+    <h2>Step 1: Upload and check your route list</h2>
+    <p class="routelist-subtitle">
+      Upload your Excel route list so we can prepare it for your logbook.
+    </p>
+
+    <div class="routelist-verification-note">
+      <p>
+        Check that the places, visit days, and addresses are correct before generating your logbook.
+      </p>
+    </div>
+
+    <div class="routelist-actions">
+      <div id="routelist-dropzone" class="route-dropzone">
+        <input type="file" id="routeFileInput" accept=".xlsx,.xls" hidden />
+        <p>Drop your Excel route list here or click to upload</p>
+        <div id="routelist-dropzone-filename" class="route-dropzone-filename"></div>
+      </div>
+    </div>
+
+    <div id="routeStatus" class="route-status"></div>
+    <div id="routelistPreview" class="routelist-preview hidden">
+      <div class="routes-header">
+        <h4>Routes</h4>
+        <div class="routes-actions">
+          <button type="button" id="showRoutesBtn" class="btn btn-secondary hidden">Show list</button>
+          <button type="button" id="reprocess-addresses-btn" class="btn btn-secondary hidden">Reprocess addresses</button>
+          <button type="button" id="clear-routes-btn" class="btn btn-secondary hidden">Clear Routelist</button>
+        </div>
+      </div>
+      <div id="routelistPreviewContent" class="routelist-preview-content routes-scroll" aria-label="Routelist verification"></div>
+    </div>
+  </div>
+</div>
+
+<div class="routelist-wrapper">
+  <div class="routelist-card logbook-card">
+    <h2>Step 2: Complete your logbook details</h2>
+    <p class="logbook-subtitle">Complete the details below to generate your travel logbook for submission.</p>
+    <p class="logbook-required-helper">Required fields</p>
+
+    <form id="logbookForm">
+    <div class="form-inner">
+    <div class="form-grid">
+    <h3 class="section-heading">Taxpayer Details</h3>
+      <div class="form-field tax-number-field">
+        <div class="form-group">
+          <label for="idNumber">Tax Number (optional)</label>
+          <input type="text" id="idNumber" name="idNumber" class="tax-number-input" placeholder="SARS Tax Number (optional)">
+        </div>
+      </div>
+      <div class="form-field first-name-field">
+        <div class="form-group">
+          <label for="firstName">First Name <span class="required-label">Required</span></label>
+          <input type="text" id="firstName" name="firstName" placeholder="e.g. John" required>
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="surname">Surname <span class="required-label">Required</span></label>
+          <input type="text" id="surname" name="surname" placeholder="e.g. Smith" required>
+        </div>
+      </div>
+
+    <h3 class="section-heading">Vehicle Information</h3>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="vehicleMake">Vehicle Make <span class="required-label">Required</span></label>
+          <input type="text" id="vehicleMake" name="vehicleMake" placeholder="e.g. Toyota" required>
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="vehicleModel">Vehicle Model <span class="required-label">Required</span></label>
+          <input type="text" id="vehicleModel" name="vehicleModel" placeholder="e.g. Corolla 1.6" required>
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="registrationNumber">Registration Number <span class="required-label">Required</span></label>
+          <input type="text" id="registrationNumber" name="registrationNumber" placeholder="e.g. CA 123-456" required>
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="vehicleYear">Vehicle Year (optional)</label>
+          <input type="text" id="vehicleYear" name="vehicleYear" placeholder="Optional">
+        </div>
+      </div>
+
+    <h3 class="section-heading">Travel and logbook details</h3>
+      <div class="form-field full-width">
+        <p class="logbook-route-info">Your verified route list from Step 1 will be used to generate the logbook.</p>
+      </div>
+      <div class="form-field"></div>
+      <div class="form-field full-width">
+        <div class="form-group origin-start-group">
+          <p class="origin-start-question">Where do your trips start?</p>
+          <div class="origin-type-radios">
+            <label class="radio-label"><input type="radio" name="originType" id="originTypeHome" value="home" checked> Home</label>
+            <label class="radio-label"><input type="radio" name="originType" id="originTypeWork" value="work"> Work / Office</label>
+            <label class="radio-label"><input type="radio" name="originType" id="originTypeOther" value="other"> Other location</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-field full-row">
+        <div class="form-group">
+          <label for="originAddress">Starting address <span class="required-label">Required</span></label>
+          <input type="text" id="originAddress" name="originAddress" placeholder="Home address" required class="origin-address-input">
+          <span class="help-text">Enter the address where your trips usually begin.</span>
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="taxYear">Tax Year <span class="required-label">Required</span></label>
+          <select id="taxYear" name="taxYear" required></select>
+          <span class="help-text">Choose the tax year this logbook is for. SARS tax years run from 1 March to the end of February.</span>
+        </div>
+      </div>
+      <div class="form-field form-field--align-end">
+        <div class="form-group">
+          <label for="employerName">Employer Name (optional)</label>
+          <input type="text" id="employerName" name="employerName" placeholder="Optional">
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="startDate">Start Date <span class="required-label">Required</span></label>
+          <input type="date" id="startDate" name="startDate" required>
+        </div>
+      </div>
+      <div class="form-field">
+        <div class="form-group">
+          <label for="endDate">End Date <span class="required-label">Required</span></label>
+          <input type="date" id="endDate" name="endDate" required>
+        </div>
+      </div>
+      <div class="form-field full-width">
+        <div class="form-group">
+          <label for="currentWeek">4-week cycle — week on start date <span class="required-label">Required</span></label>
+          <select id="currentWeek" name="currentWeek" required>
+            <option value="1" selected>Week 1</option>
+            <option value="2">Week 2</option>
+            <option value="3">Week 3</option>
+            <option value="4">Week 4</option>
+          </select>
+          <span class="help-text">Which cycle week (1–4) the logbook start date falls in — aligns sales-rep routes with your real rotation (ClearTrack-style).</span>
+        </div>
+      </div>
+      <div class="form-field full-width">
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label for="openingKm">Opening odometer reading <span class="required-label">Required</span></label>
+            <input type="number" id="openingKm" name="openingKm" min="0" placeholder="Enter opening odometer reading" required>
+            <span class="help-text">Enter the odometer reading at the start of the tax year.</span>
+          </div>
+          <div class="form-group">
+            <label for="closingKm">Closing odometer reading <span class="required-label">Required</span></label>
+            <input type="number" id="closingKm" name="closingKm" min="0" placeholder="Enter closing odometer reading" required>
+            <span class="help-text">Enter the odometer reading at the end of the tax year.</span>
+          </div>
+        </div>
+      </div>
+      <div class="optional-adjustments-section">
+        <div class="optional-adjustments-label">Add non-driving days or manual trips</div>
+        <div class="logbook-two-column">
+          <div class="action-block">
+            <div class="helper-text">
+              Leave, training, sick days, or vehicle repairs
+            </div>
+            <button type="button" id="openLeaveModalBtn" class="btn btn-primary">Add non-driving days</button>
+          </div>
+          <div class="action-block">
+            <div class="helper-text">
+              Office visits, meetings, client travel
+            </div>
+            <button type="button" id="addManualTripBtn" class="btn btn-primary">Add manual trip</button>
+          </div>
+          <div id="leavePreview" class="adjustment-preview leave-panel"></div>
+          <div id="manualPreview" class="adjustment-preview manual-panel"></div>
+        </div>
+      </div>
+    </div>
+    <div class="logbook-opt-buttons">
+      <input type="hidden" id="leaveDaysInput" name="leaveDays">
+      <div id="leaveDaysList" class="tag-list hidden" aria-hidden="true"></div>
+      <input type="hidden" id="manualEntriesInput" name="manualEntries">
+      <div id="manualTripsList" class="tag-list hidden" aria-hidden="true"></div>
+      <div id="manualEntriesList"></div>
+    </div>
+    </div>
+
+    <div class="form-actions">
+      <div class="logbook-generate">
+        <div class="generate-logbook-wrapper">
+          <div class="logbook-confirmation">
+            <label>
+              <input type="checkbox" id="confirm-logbook-review">
+              I confirm that I have reviewed the information entered.
+            </label>
+          </div>
+          <div class="logbook-confirmation">
+            <label>
+              <input type="checkbox" id="confirm-addresses-correct">
+              I confirm that all route addresses are correct and any unresolved addresses have been updated
+            </label>
+          </div>
+          <div class="generate-btn-container">
+            <button type="submit" id="generateLogbookBtn" class="btn btn-primary generate-btn generate-logbook-button disabled" disabled>Generate My Logbook</button>
+            <div class="logbook-loading hidden" id="logbookLoadingBlock" aria-live="polite">
+              <div class="loading-car-block">
+                <div class="loading-car">🚗</div>
+                <div class="loading-text">Generating your logbook...</div>
+              </div>
+            </div>
+          </div>
+          <p class="logbook-disclaimer"><strong>Important:</strong> This logbook is generated automatically from the information you provide. Please review all entries carefully before submitting it to SARS. Auto Logbook SA does not verify user-entered data and cannot accept responsibility for errors or omissions.</p>
+        </div>
+      </div>
+    </div>
+  </form>
+
+    <div id="logbookStatus" class="logbook-status"></div>
+  </div>
+</div>
+  </div>
+
+<!-- Non-Working Days modal -->
+<div id="leaveModal" class="vehicle-modal select-leave-modal hidden">
+  <div class="vehicle-modal-content">
+    <div class="vehicle-modal-header">
+      <h3 class="vehicle-modal-title">Select Non-Working Days</h3>
+      <button type="button" class="vehicle-modal-close" id="closeLeaveModal" aria-label="Close">×</button>
+    </div>
+    <div class="vehicle-modal-body modal-body">
+      <div class="ct-calendar">
+        <div class="ct-calendar-header">
+          <button id="ct-prev-month" class="ct-nav-btn" type="button">‹</button>
+          <div class="ct-month-year">
+            <select id="ct-month-select" class="calendar-select"></select>
+            <select id="ct-year-select" class="calendar-select"></select>
+          </div>
+          <button id="ct-next-month" class="ct-nav-btn" type="button">›</button>
+        </div>
+        <div class="ct-weekdays">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+          <div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="ct-calendar-grid" class="ct-calendar-grid"></div>
+      </div>
+      <div class="modal-form-group">
+        <div class="reason-row">
+          <label for="reasonSelect">Reason</label>
+          <select id="reasonSelect" class="calendar-select">
+            <option value="Leave">Leave</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div id="otherReasonContainer" class="modal-form-group other-reason hidden">
+        <label for="otherReasonInput">Describe reason</label>
+        <input type="text" id="otherReasonInput" class="calendar-select" placeholder="Enter reason (e.g. Vehicle went in for repairs)">
+      </div>
+      <div class="selected-dates">
+        <label>Selected dates</label>
+        <div id="selectedDateChips" class="date-chips"></div>
+      </div>
+      <div id="leaveModalError" class="form-error"></div>
+      <button type="button" id="leaveAddBtn" class="btn btn-primary">Add Days</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Manual Trip modal -->
+<div id="manualAdjustmentModal" class="vehicle-modal select-leave-modal hidden">
+  <div class="vehicle-modal-content">
+    <div class="vehicle-modal-header">
+      <h3 class="vehicle-modal-title">Add Manual Trip</h3>
+      <button type="button" class="vehicle-modal-close" id="closeManualAdjustmentModal" aria-label="Close">×</button>
+    </div>
+    <div class="vehicle-modal-body modal-body">
+      <div id="manualTripCalendar" class="ct-calendar">
+        <div class="ct-calendar-header">
+          <button id="ct-mt-prev-month" class="ct-nav-btn" type="button">‹</button>
+          <div class="ct-month-year">
+            <select id="ct-mt-month-select" class="calendar-select"></select>
+            <select id="ct-mt-year-select" class="calendar-select"></select>
+          </div>
+          <button id="ct-mt-next-month" class="ct-nav-btn" type="button">›</button>
+        </div>
+        <div class="ct-weekdays">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+          <div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="ct-mt-calendar-grid" class="ct-calendar-grid"></div>
+      </div>
+      <div class="selected-dates manual-trip-selected">
+        <label>Selected dates</label>
+        <div id="manualTripSelectedDateDisplay" class="date-chips"></div>
+      </div>
+      <div class="form-group">
+        <label for="tripReason">Reason</label>
+        <input type="text" id="tripReason" class="modal-input" placeholder="Enter reason for manual trip">
+      </div>
+      <div class="form-group">
+        <label for="tripFrom">From</label>
+        <input type="text" id="tripFrom" class="modal-input" placeholder="Starting location">
+      </div>
+      <div class="form-group">
+        <label for="tripTo">To</label>
+        <input type="text" id="tripTo" class="modal-input" placeholder="Destination">
+      </div>
+      <div id="manualTripModalError" class="form-error"></div>
+      <div class="manual-all-day-group" style="margin-top:12px;">
+        <label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="manual-all-day">
+          All day
+        </label>
+        <div style="font-size:12px; color:#777; margin-left:22px; margin-top:4px;">
+          Replaces all trips for this day
+        </div>
+      </div>
+      <button type="button" id="manualAdjustmentSaveBtn" class="btn btn-primary" style="margin-top:16px;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Trip details modal -->
+<div id="manualTripDetailsModal" class="vehicle-modal hidden">
+  <div class="vehicle-modal-content">
+    <div class="vehicle-modal-header">
+      <h3 class="vehicle-modal-title">Manual Trip Details</h3>
+      <button type="button" class="vehicle-modal-close" id="closeManualTripDetailsModal" aria-label="Close">×</button>
+    </div>
+    <div class="vehicle-modal-body">
+      <div class="form-group">
+        <label for="manualTripFrom">From</label>
+        <input type="text" id="manualTripFrom" placeholder="From">
+      </div>
+      <div class="form-group">
+        <label for="manualTripTo">To</label>
+        <input type="text" id="manualTripTo" placeholder="To">
+      </div>
+      <div class="form-group">
+        <label for="manualTripPurpose">Purpose</label>
+        <input type="text" id="manualTripPurpose" placeholder="Purpose">
+      </div>
+      <div class="form-group">
+        <label for="manualTripKm">KM</label>
+        <input type="number" id="manualTripKm" min="0" placeholder="KM">
+      </div>
+    </div>
+    <div class="vehicle-modal-footer">
+      <button type="button" id="cancelManualTripDetails" class="btn btn-outline">Cancel</button>
+      <button type="button" id="saveManualTripDetails" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+  </div>
+  </div>
+  </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+      <p>© Auto Logbook SA</p>
+
+      <div class="footer-links">
+        <a href="#" id="openPrivacyFooter">Privacy</a>
+        <span class="footer-separator">•</span>
+        <a href="#" id="openTermsFooter">Terms</a>
+        <span class="footer-separator">•</span>
+        <a href="#" id="openRefundPolicyFooter">Refund Policy</a>
+        <span class="footer-separator">•</span>
+        <a href="#" id="openDisclaimerFooter">Disclaimer</a>
+        <span class="footer-separator">•</span>
+        <a href="mailto:support@autologbooksa.co.za">Contact</a>
+      </div>
+
+      <p class="engine">Powered by ClearTrack Logbook Engine</p>
+      <p class="footer-legal">Auto Logbook SA is an independent tool designed to assist with SARS logbook record-keeping. Users remain responsible for verifying all information.</p>
+      </div>
+    </div>
+  </footer>
+
+  <div id="legal-modals-root"></div>
+
+  <script src="js/app.js"></script>
+  <script src="js/legal-modals.js"></script>
+
+  <!--
+  LOGBOOK ENGINE SCRIPT LOAD ORDER (required – do not change)
+  Scripts must load in this order because of dependencies:
+  1. XLSX library (SheetJS) – required for parsing Excel routelist
+  2. parseRouteListExcel.js – reads workbook, depends on XLSX
+  3. businessRouteParser.js – parses rows into route objects
+  4. dateRange.js – date utilities
+  5. logbookEngine.js – core logbook generation (entries, odometer)
+  6. distanceMatrixRouting.js – Google Distance Matrix / haversine
+  7. local-config.js – API base URL etc.
+  8. logbook-page.js – UI only; must load last (store rows: POST /engine/resolve-store; manual/home geocode: POST /api/geocodeAddresses)
+  -->
+  <script src="/vendor/xlsx-style.min.js"></script>
+  <script src="engine/parseRouteListExcel.js"></script>
+  <script src="engine/parsers/businessRouteParser.js"></script>
+  <script src="engine/dateRange.js"></script>
+  <script src="engine/logbookEngine.js"></script>
+  <script src="engine/routing/distanceMatrixRouting.js"></script>
+  <script src="js/local-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
+  <script src="/firebase/init.js"></script>
+  <script type="module" src="js/initLogbookService.js"></script>
+  <script defer src="js/logbook-page.js"></script>
+  <script>
+  function checkScreenSize() {
+    var isMobile = window.innerWidth < 768;
+    var block = document.getElementById('mobile-block-message');
+    var desktop = document.getElementById('logbook-desktop-container');
+    if (block && desktop) {
+      if (isMobile) {
+        block.classList.remove('hidden');
+        desktop.classList.add('hidden');
+      } else {
+        block.classList.add('hidden');
+        desktop.classList.remove('hidden');
+      }
+    }
+  }
+  window.addEventListener('load', checkScreenSize);
+  window.addEventListener('resize', checkScreenSize);
+  </script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    h2 { margin-top: 40px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    td, th { border: 1px solid #ccc; padding: 8px; }
+    input { width: 100px; }
+    button { padding: 6px 10px; margin: 5px 0; }
+  </style>
+</head>
+<body>
+
+<h1>Admin Dashboard</h1>
+
+<!-- ================================
+UPLOAD SECTION
+================================ -->
+<h2>Upload Stores</h2>
+
+<input type="file" id="fileInput" accept=".xlsx,.xls" />
+<button id="uploadBtn">Upload</button>
+<pre id="uploadStatus"></pre>
+
+<!-- ================================
+MISSING COORDS SECTION
+================================ -->
+<h2>Fix Missing Coordinates</h2>
+
+<button id="loadMissingBtn">Load Missing Stores</button>
+
+<table>
+  <thead>
+    <tr>
+      <th>Store</th>
+      <th>Address</th>
+      <th>Lat</th>
+      <th>Lng</th>
+      <th>Save</th>
+    </tr>
+  </thead>
+  <tbody id="coordsTable"></tbody>
+</table>
+
+<script>
+const ADMIN_KEY = "your-secret-key";
+
+// ================================
+// UPLOAD LOGIC
+// ================================
+document.getElementById("uploadBtn").onclick = async () => {
+  const file = document.getElementById("fileInput").files[0];
+  const status = document.getElementById("uploadStatus");
+
+  if (!file) return alert("Select a file");
+
+  status.textContent = "Reading file...";
+
+  try {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+
+    const required = ["Customer", "Address", "Suburb", "Province", "City"];
+    const missing = required.filter(c => !(c in rows[0]));
+
+    if (missing.length) {
+      throw new Error("Missing columns: " + missing.join(", "));
+    }
+
+    const cleaned = rows.map(r => ({
+      Customer: String(r.Customer || "").trim(),
+      Address: String(r.Address || "").trim(),
+      Suburb: String(r.Suburb || "").trim(),
+      Province: String(r.Province || "").trim(),
+      City: String(r.City || "").trim()
+    }));
+
+    const res = await fetch("/api/admin/upload-stores", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-key": ADMIN_KEY
+      },
+      body: JSON.stringify({ rows: cleaned })
+    });
+
+    const result = await res.json();
+    status.textContent = JSON.stringify(result, null, 2);
+
+    if (res.ok) alert(`Upload complete\nTotal: ${result.total}\nMissing coords: ${result.missing}`);
+    else alert("Upload failed");
+
+  } catch (e) {
+    status.textContent = e.message;
+    alert(e.message);
+  }
+};
+
+// ================================
+// LOAD MISSING COORDS
+// ================================
+document.getElementById("loadMissingBtn").onclick = async () => {
+
+  const res = await fetch("/api/admin/missing-coords", {
+    headers: { "x-admin-key": ADMIN_KEY }
+  });
+
+  const stores = await res.json();
+  const tbody = document.getElementById("coordsTable");
+
+  tbody.innerHTML = "";
+
+  stores.forEach(store => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${store.customer}</td>
+      <td>${store.address}</td>
+      <td><input value="${store.lat || ""}"></td>
+      <td><input value="${store.lng || ""}"></td>
+      <td><button>Save</button></td>
+    `;
+
+    const btn = tr.querySelector("button");
+
+    btn.onclick = async () => {
+      const inputs = tr.querySelectorAll("input");
+
+      const lat = parseFloat(inputs[0].value);
+      const lng = parseFloat(inputs[1].value);
+
+      await fetch("/api/admin/update-coords", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": ADMIN_KEY
+        },
+        body: JSON.stringify({
+          normalizedQuery: store.normalizedQuery,
+          lat,
+          lng
+        })
+      });
+
+      alert("Saved");
+      tr.remove();
+    };
+
+    tbody.appendChild(tr);
+  });
+};
+</script>
+
+</body>
+</html>

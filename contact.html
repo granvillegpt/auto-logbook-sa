@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <title>Contact – Auto Logbook SA</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="description" content="Contact Auto Logbook SA for assistance with your travel logbook or tax questions." />
+
+  <link rel="icon" type="image/png" href="assets/logos/auto_logbook_favicon-white.png">
+
+  <link rel="stylesheet" href="css/ct-theme.css" />
+  <link rel="stylesheet" href="responsive-fixes.css" />
+  <link rel="stylesheet" href="mobile-menu-style6.css" />
+  <link rel="stylesheet" href="header-responsive-fixes.css" />
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fa;
+      color: #1f2933;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    /* Header - Clean and Simple */
+    header {
+      background: #0b7285;
+      color: #fff;
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      width: 100%;
+      min-height: 60px;
+    }
+
+    /* Back link */
+    header > a:first-of-type {
+      color: #e0fbff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    header > a:first-of-type:hover {
+      text-decoration: underline;
+    }
+
+    /* Logo - centered */
+    header img {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 32px;
+      width: auto;
+      filter: brightness(0) invert(1);
+      z-index: 5;
+    }
+
+    /* Main content */
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+      background: #ffffff;
+      width: 100%;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      line-height: 1.2;
+    }
+
+    h2 {
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+      font-size: clamp(1rem, 3vw, 1.1rem);
+    }
+
+    p {
+      font-size: clamp(0.9rem, 2vw, 0.95rem);
+      line-height: 1.6;
+      word-wrap: break-word;
+    }
+
+    .card {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      border-radius: 12px;
+      background: #f0f9fb;
+      width: 100%;
+    }
+
+    label {
+      display: block;
+      margin-top: 0.75rem;
+      font-size: clamp(0.85rem, 2vw, 0.9rem);
+      color: #334e68;
+    }
+
+    input, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 0.25rem;
+      padding: 0.6rem 0.7rem;
+      border-radius: 8px;
+      border: 1px solid #cbd2e1;
+      font-size: clamp(0.9rem, 2vw, 0.95rem);
+      font-family: inherit;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    button {
+      margin-top: 1rem;
+      padding: 0.75rem 1.4rem;
+      border-radius: 999px;
+      border: none;
+      background: #0b7285;
+      color: #ffffff;
+      font-size: clamp(0.9rem, 2vw, 0.95rem);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    @media (min-width: 481px) {
+      button {
+        width: auto;
+      }
+    }
+
+    @media (max-width: 480px) {
+      button {
+        width: 100%;
+      }
+      input, textarea {
+        font-size: 16px;
+      }
+      textarea {
+        min-height: 100px;
+      }
+    }
+
+    button:hover {
+      background: #095a69;
+    }
+
+    button:disabled {
+      background: #95a5a6;
+      cursor: not-allowed;
+    }
+
+    .note {
+      font-size: clamp(0.8rem, 2vw, 0.85rem);
+      color: #6b7785;
+      margin-top: 0.75rem;
+    }
+
+    a {
+      color: #0b7285;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+      header {
+        padding: 0.75rem 1rem;
+        min-height: 56px;
+      }
+
+      header img {
+        height: 28px;
+      }
+
+      main {
+        padding: 1.5rem 1rem 2rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      header {
+        padding: 0.625rem 0.75rem;
+        min-height: 52px;
+      }
+
+      header > a:first-of-type {
+        font-size: 0.9rem;
+      }
+
+      header img {
+        height: 24px;
+      }
+
+      main {
+        padding: 1rem 0.75rem 1.5rem;
+      }
+
+      .card {
+        padding: 1rem;
+      }
+    }
+
+    @media (max-width: 320px) {
+      header > a:first-of-type span:last-child {
+        display: none;
+      }
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <header>
+
+    <a href="index.html">
+      <span>←</span>
+      <span>Auto Logbook SA</span>
+    </a>
+
+    <img src="assets/logos/auto_logbook_logo-white%20(1).png" alt="Auto Logbook SA" class="site-logo">
+
+    <button class="menu-toggle-style6" aria-label="Toggle menu" id="menuToggle">☰</button>
+
+    <nav class="style6-menu" id="mainNav">
+
+      <a href="index.html">Home</a>
+      <a href="logbook.html">Generate Logbook</a>
+      <a href="contact.html">Contact</a>
+
+    </nav>
+
+  </header>
+
+  <main>
+
+    <h1>Contact Auto Logbook SA</h1>
+
+    <p>
+
+      Need help with your travel logbook or have questions? Send us a message or
+
+      contact us using the details below.
+
+    </p>
+
+    <div class="card">
+
+      <h2 style="margin-top: 0;">Support details</h2>
+
+      <p>
+
+        Email: <a href="mailto:support@autologbooksa.co.za">support@autologbooksa.co.za</a><br /><br />
+
+        Please include your full name and a brief description of the
+
+        issue. <strong>Do not</strong> include SARS eFiling or banking passwords in any message.
+
+      </p>
+
+    </div>
+
+
+
+    <form id="contact-form" style="margin-top: 2rem;">
+
+      <h2 style="margin-top: 0;">Quick contact form</h2>
+
+
+
+      <label for="name">Full name</label>
+
+      <input id="name" type="text" required />
+
+
+
+      <label for="email">Email address</label>
+
+      <input id="email" type="email" required />
+
+
+
+      <label for="message">How can we help?</label>
+
+      <textarea id="message" required></textarea>
+
+
+
+      <button type="submit">Send message</button>
+
+      <p class="note">
+
+        This form is for convenience only. It does not submit to SARS and does not collect any
+
+        third-party login details.
+
+      </p>
+
+    </form>
+
+  </main>
+
+  <script>
+    // Mobile menu toggle - Style 6
+    (function() {
+      const menuToggle = document.getElementById("menuToggle");
+      const mainNav = document.getElementById("mainNav");
+
+      if (menuToggle && mainNav) {
+        function toggleMenu() {
+          mainNav.classList.toggle("active");
+          menuToggle.classList.toggle("active");
+        }
+
+        function closeMenu() {
+          mainNav.classList.remove("active");
+          menuToggle.classList.remove("active");
+        }
+
+        menuToggle.addEventListener("click", function(e) {
+          e.stopPropagation();
+          toggleMenu();
+        });
+
+        const navLinks = mainNav.querySelectorAll("a");
+        navLinks.forEach(function(link) {
+          link.addEventListener("click", function() {
+            closeMenu();
+          });
+        });
+
+        const header = document.querySelector("header");
+        if (header) {
+          document.addEventListener("click", function(event) {
+            if (!header.contains(event.target) && mainNav.classList.contains("active")) {
+              closeMenu();
+            }
+          });
+        }
+      }
+    })();
+
+    document.getElementById('contact-form').addEventListener('submit', function(e) {
+
+      e.preventDefault();
+
+      const name = document.getElementById('name').value.trim();
+
+      const email = document.getElementById('email').value.trim();
+
+      const message = document.getElementById('message').value.trim();
+
+
+
+      if (!name || !email || !message) {
+
+        alert('Please fill in all fields.');
+
+        return;
+
+      }
+
+
+
+      // For now, just show a confirmation message
+
+      // In the future, this could be wired to a backend service or email API
+
+      alert('Thank you for your message. We will get back to you as soon as possible.\n\n' +
+
+            'Note: This form is a placeholder. For immediate assistance, please email support@autologbooksa.co.za');
+
+
+
+      // Optionally clear the form
+
+      document.getElementById('contact-form').reset();
+
+    });
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logbook Engine Lab</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="file"] {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover {
+            background-color: #0b7dda;
+        }
+        .error {
+            color: #d32f2f;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            color: #2e7d32;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            display: none;
+        }
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            display: none;
+        }
+        .result-section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .totals {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: white;
+            border-radius: 4px;
+        }
+        .totals pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .leave-row {
+            background-color: #e8f4ff; /* very soft blue */
+        }
+        .holiday-row {
+            background-color: #fff8e1; /* soft amber */
+        }
+        .nonwork-row {
+            background-color: #f5f5f5; /* light grey */
+        }
+        .office-row {
+            background-color: #e3f2fd; /* soft blue */
+        }
+        .colleague-row {
+            background-color: #f3e5f5; /* soft purple */
+        }
+        .actions {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Logbook Engine Lab</h1>
+        
+        <form id="logbookForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="routeFile">Excel Route List File:</label>
+                <input type="file" id="routeFile" name="routeFile" accept=".xlsx,.xls" required>
+            </div>
+
+            <div class="form-group">
+                <label for="homeAddress">Home Address:</label>
+                <input type="text" id="homeAddress" name="homeAddress" placeholder="e.g., 123 Home Street, Cape Town" required>
+            </div>
+
+            <div class="form-group">
+                <label for="openingKm">Opening KM:</label>
+                <input type="number" id="openingKm" name="openingKm" min="0" value="50000" required>
+            </div>
+
+            <div class="form-group">
+                <label for="startDate">Start Date:</label>
+                <input type="date" id="startDate" name="startDate" required>
+            </div>
+
+            <div class="form-group">
+                <label for="endDate">End Date:</label>
+                <input type="date" id="endDate" name="endDate" required>
+            </div>
+
+            <div class="form-group">
+                <label for="currentWeek">Current Week (1-4):</label>
+                <input type="number" id="currentWeek" name="currentWeek" min="1" max="4" value="1" required>
+            </div>
+
+            <button type="submit" id="generateButton">Generate Logbook</button>
+        </form>
+
+        <div id="error" class="error"></div>
+        <div id="success" class="success"></div>
+
+        <div id="resultSection" class="result-section">
+            <h2>Results</h2>
+            
+            <div class="totals">
+                <h3>Totals</h3>
+                <pre id="totalsOutput"></pre>
+            </div>
+
+            <div class="actions">
+                <button id="exportCsvButton" class="secondary">Export CSV</button>
+            </div>
+
+            <h3>Logbook Entries</h3>
+            <table id="entriesTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Opening KM</th>
+                        <th>Closing KM</th>
+                        <th>Business KM</th>
+                    </tr>
+                </thead>
+                <tbody id="entriesBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Set default dates (current tax year)
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const taxYearStart = new Date(currentYear, 2, 1); // March 1
+        const taxYearEnd = new Date(currentYear + 1, 1, 28); // February 28
+
+        if (today < taxYearStart) {
+            document.getElementById('startDate').value = new Date(currentYear - 1, 2, 1).toISOString().split('T')[0];
+            document.getElementById('endDate').value = new Date(currentYear, 1, 28).toISOString().split('T')[0];
+        } else {
+            document.getElementById('startDate').value = taxYearStart.toISOString().split('T')[0];
+            document.getElementById('endDate').value = taxYearEnd.toISOString().split('T')[0];
+        }
+
+        let currentResult = null;
+
+        // Handle form submission
+        document.getElementById('logbookForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Hide previous results
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('success').style.display = 'none';
+            document.getElementById('resultSection').style.display = 'none';
+            
+            const generateButton = document.getElementById('generateButton');
+            generateButton.disabled = true;
+            generateButton.textContent = 'Generating...';
+
+            try {
+                // Get form data
+                const formData = new FormData();
+                formData.append('routeFile', document.getElementById('routeFile').files[0]);
+                formData.append('homeAddress', document.getElementById('homeAddress').value);
+                formData.append('openingKm', document.getElementById('openingKm').value);
+                formData.append('startDate', document.getElementById('startDate').value);
+                formData.append('endDate', document.getElementById('endDate').value);
+                formData.append('currentWeek', document.getElementById('currentWeek').value);
+
+                // Call API
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate logbook');
+                }
+
+                if (!data.success || !data.result) {
+                    throw new Error('Invalid response from server');
+                }
+
+                currentResult = data.result;
+
+                // Display totals
+                document.getElementById('totalsOutput').textContent = JSON.stringify(data.result.totals, null, 2);
+
+                // Display entries in table
+                const entriesBody = document.getElementById('entriesBody');
+                entriesBody.innerHTML = '';
+                data.result.entries.forEach(entry => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${entry.date}</td>
+                        <td>${entry.from}</td>
+                        <td>${entry.to}</td>
+                        <td>${entry.openingKm}</td>
+                        <td>${entry.closingKm}</td>
+                        <td>${entry.businessKm}</td>
+                    `;
+                    if (entry.purpose === "Leave Day") {
+                        row.classList.add("leave-row");
+                    }
+                    else if (entry.purpose === "Public Holiday") {
+                        row.classList.add("holiday-row");
+                    }
+                    else if (entry.purpose === "Non-Work Day") {
+                        row.classList.add("nonwork-row");
+                    }
+                    else if (entry.purpose === "Office Day") {
+                        row.classList.add("office-row");
+                    }
+                    else if (entry.purpose === "Drove with Colleague") {
+                        row.classList.add("colleague-row");
+                    }
+                    entriesBody.appendChild(row);
+                });
+
+                // Show result section
+                document.getElementById('resultSection').style.display = 'block';
+                document.getElementById('success').textContent = `Successfully generated ${data.result.entries.length} logbook entries`;
+                document.getElementById('success').style.display = 'block';
+
+            } catch (error) {
+                document.getElementById('error').textContent = `Error: ${error.message}`;
+                document.getElementById('error').style.display = 'block';
+                console.error('Error:', error);
+            } finally {
+                generateButton.disabled = false;
+                generateButton.textContent = 'Generate Logbook';
+            }
+        });
+
+        // Handle CSV export
+        document.getElementById('exportCsvButton').addEventListener('click', async () => {
+            if (!currentResult || !currentResult.entries) {
+                alert('No logbook data to export. Please generate a logbook first.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/export/csv', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        entries: currentResult.entries
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to export CSV');
+                }
+
+                // Download CSV file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'logbook.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                alert(`Error exporting CSV: ${error.message}`);
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,682 @@
+<div class="routelist-wrapper">
+  <div class="routelist-card">
+    <h2>Routelist Review</h2>
+    <p class="routelist-subtitle">
+      Upload your route list to generate a verified, formatted routelist for logbook creation.
+    </p>
+
+    <div class="routelist-verification-note">
+      <p>
+        Please review the generated routelist and confirm that all customers, active days, weeks, and addresses are correct before continuing.
+      </p>
+    </div>
+
+    <div class="routelist-template-download">
+      <a href="#" class="secondary-btn" id="downloadRoutelistTemplateBtn">Download Routelist Template</a>
+      <p class="routelist-template-helper">Please download and complete the ClearTrack routelist template before uploading. Only files using this template can be processed.</p>
+    </div>
+
+    <div class="routelist-actions">
+      <div id="routelist-dropzone" class="route-dropzone">
+        <input
+          type="file"
+          id="routeFileInput"
+          accept=".xlsx,.xls"
+          hidden
+        />
+        <p>Drop Excel file here or click to upload</p>
+        <div id="routelist-dropzone-filename" class="route-dropzone-filename"></div>
+      </div>
+      <span class="help-text routelist-upload-helper">Upload your completed routelist template here. Files that do not match the ClearTrack template format will be rejected.</span>
+
+      <button
+        id="parseRouteBtn"
+        class="primary-btn"
+      >
+        Generate Routelist (Free)
+      </button>
+    </div>
+
+    <div id="routeStatus" class="route-status"></div>
+  </div>
+</div>
+
+<div class="routelist-wrapper">
+  <div class="routelist-card logbook-card">
+    <h2>Logbook</h2>
+    <p class="logbook-subtitle">Create a SARS-compliant vehicle logbook using your verified routelist.</p>
+    <p class="logbook-intro">Complete the details below to generate your formatted logbook file.</p>
+    <p class="logbook-required-helper">Required fields</p>
+
+    <form id="logbookForm">
+    <h3 class="section-heading">Taxpayer Details</h3>
+    <div class="form-group">
+      <label for="firstName">First Name <span class="required-label">Required</span></label>
+      <input type="text" id="firstName" name="firstName" placeholder="e.g. John" required>
+    </div>
+    <div class="form-group">
+      <label for="surname">Surname <span class="required-label">Required</span></label>
+      <input type="text" id="surname" name="surname" placeholder="e.g. Smith" required>
+    </div>
+    <div class="form-group">
+      <label for="idNumber">Tax Number (optional)</label>
+      <input type="text" id="idNumber" name="idNumber" placeholder="SARS Tax Number (optional)">
+    </div>
+
+    <h3 class="section-heading">Vehicle Information</h3>
+    <div class="form-group">
+      <label for="vehicleMake">Vehicle Make <span class="required-label">Required</span></label>
+      <input type="text" id="vehicleMake" name="vehicleMake" placeholder="e.g. Toyota" required>
+    </div>
+    <div class="form-group">
+      <label for="vehicleModel">Vehicle Model <span class="required-label">Required</span></label>
+      <input type="text" id="vehicleModel" name="vehicleModel" placeholder="e.g. Corolla 1.6" required>
+    </div>
+    <div class="form-group">
+      <label for="registrationNumber">Registration Number <span class="required-label">Required</span></label>
+      <input type="text" id="registrationNumber" name="registrationNumber" placeholder="e.g. CA 123-456" required>
+    </div>
+    <div class="form-group">
+      <label for="vehicleYear">Vehicle Year (optional)</label>
+      <input type="text" id="vehicleYear" name="vehicleYear" placeholder="Optional">
+    </div>
+
+    <h3 class="section-heading">Vehicle & Tax Year</h3>
+    <div class="form-group">
+      <label for="logbookExcelInput">Excel Route List <span class="required-label">Required</span></label>
+      <div id="route-dropzone" class="route-dropzone">
+        <input type="file" id="logbookExcelInput" name="routeFile" accept=".xlsx,.xls" hidden>
+        <p>Drop Excel file here or click to upload</p>
+        <div id="route-dropzone-filename" class="route-dropzone-filename"></div>
+      </div>
+      <span class="help-text">Required columns: Customer, Address, Suburb, Monday–Saturday, Week</span>
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="workSaturdays" name="workSaturdays">
+        <span>Work Saturdays</span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label for="homeAddress">Home Address <span class="required-label">Required</span></label>
+      <input type="text" id="homeAddress" name="homeAddress" placeholder="Home address" required>
+    </div>
+    <div class="form-group">
+      <label for="openingKm">Opening KM <span class="required-label">Required</span></label>
+      <input type="number" id="openingKm" name="openingKm" min="0" placeholder="Enter opening odometer reading" required>
+      <span class="help-text">Mileage values are provided manually. Please ensure odometer readings are accurate.</span>
+    </div>
+    <div class="form-group">
+      <label for="closingKm">Closing KM <span class="required-label">Required</span></label>
+      <input type="number" id="closingKm" name="closingKm" min="0" placeholder="Enter closing odometer reading" required>
+      <span class="help-text">Required. Used to calculate total mileage.</span>
+    </div>
+    <div class="form-group">
+      <label for="taxYear">Tax Year <span class="required-label">Required</span></label>
+      <select id="taxYear" name="taxYear" required></select>
+      <span class="help-text">Tax year runs from 1 March to 28 February.</span>
+    </div>
+    <div class="form-group">
+      <label for="startDate">Start Date <span class="required-label">Required</span></label>
+      <input type="date" id="startDate" name="startDate" required>
+    </div>
+    <div class="form-group">
+      <label for="endDate">End Date <span class="required-label">Required</span></label>
+      <input type="date" id="endDate" name="endDate" required>
+    </div>
+    <div class="form-group">
+      <label for="employerName">Employer Name (optional)</label>
+      <input type="text" id="employerName" name="employerName" placeholder="Optional">
+    </div>
+    <div class="form-group">
+      <label for="currentWeek">Current Week (1–4) <span class="required-label">Required</span></label>
+      <input type="number" id="currentWeek" name="currentWeek" min="1" max="4" value="1" required>
+    </div>
+    <div class="logbook-opt-buttons">
+      <p class="logbook-opt-helper">Optional adjustments</p>
+      <div class="form-group">
+        <button type="button" id="openLeaveModalBtn" class="primary-btn">Select Leave Days</button>
+        <input type="hidden" id="leaveDaysInput" name="leaveDays">
+        <div id="leaveDaysList" class="tag-list"></div>
+      </div>
+      <div class="form-group">
+        <button type="button" id="addManualTripBtn" class="primary-btn">Add Manual Trip</button>
+        <input type="hidden" id="manualEntriesInput" name="manualEntries">
+        <div id="manualTripsList" class="tag-list"></div>
+        <div id="manualEntriesList"></div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <div class="logbook-cta">
+        <p class="logbook-price-line">R210 once-off</p>
+        <button type="submit" id="generateLogbookBtn" class="primary-btn">Generate Logbook</button>
+      </div>
+    </div>
+  </form>
+
+    <div id="logbookStatus" class="logbook-status"></div>
+  </div>
+</div>
+
+<!-- Leave Days modal: clean rebuild -->
+<div id="leaveModal" class="vehicle-modal select-leave-modal hidden">
+  <div class="vehicle-modal-content">
+    <div class="vehicle-modal-header">
+      <h3 class="vehicle-modal-title">Select Leave Days</h3>
+      <button type="button" class="vehicle-modal-close" id="closeLeaveModal" aria-label="Close">×</button>
+    </div>
+    <div class="vehicle-modal-body modal-body">
+      <div class="ct-calendar">
+        <div class="ct-calendar-header">
+          <button id="ct-prev-month" class="ct-nav-btn" type="button">‹</button>
+          <div class="ct-month-year">
+            <select id="ct-month-select"></select>
+            <select id="ct-year-select"></select>
+          </div>
+          <button id="ct-next-month" class="ct-nav-btn" type="button">›</button>
+        </div>
+        <div class="ct-weekdays">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+          <div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="ct-calendar-grid" class="ct-calendar-grid"></div>
+      </div>
+      <div class="leave-chips-label">Selected dates</div>
+      <div id="leaveDateList"></div>
+      <button type="button" id="leaveAddBtn" class="btn btn-primary">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Adjustment modal: calendar + type (office / colleague / manual trip) -->
+<div id="manualAdjustmentModal" class="vehicle-modal select-leave-modal hidden">
+  <div class="vehicle-modal-content">
+    <div class="vehicle-modal-header">
+      <h3 class="vehicle-modal-title">Add Manual Trip</h3>
+      <button type="button" class="vehicle-modal-close" id="closeManualAdjustmentModal" aria-label="Close">×</button>
+    </div>
+    <div class="vehicle-modal-body modal-body">
+      <div class="ct-calendar ct-adj-calendar">
+        <div class="ct-calendar-header">
+          <button id="ct-adj-prev-month" class="ct-nav-btn" type="button">‹</button>
+          <div class="ct-month-year">
+            <select id="ct-adj-month-select"></select>
+            <select id="ct-adj-year-select"></select>
+          </div>
+          <button id="ct-adj-next-month" class="ct-nav-btn" type="button">›</button>
+        </div>
+        <div class="ct-weekdays">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+          <div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="ct-adj-calendar-grid" class="ct-calendar-grid"></div>
+      </div>
+      <div class="leave-chips-label">Selected dates</div>
+      <div id="manualAdjustmentDateList"></div>
+      <div class="form-group">
+        <label for="manualAdjustmentType">Type</label>
+        <select id="manualAdjustmentType">
+          <option value="office">Office Day</option>
+          <option value="colleague">Driving With Colleague</option>
+          <option value="manual">Manual Trip</option>
+        </select>
+      </div>
+      <button type="button" id="manualAdjustmentSaveBtn" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Trip details modal (only when type = Manual Trip): From, To, Purpose, KM -->
+<div id="manualTripDetailsModal" class="vehicle-modal hidden">
+  <div class="vehicle-modal-content">
+    <div class="vehicle-modal-header">
+      <h3 class="vehicle-modal-title">Manual Trip Details</h3>
+      <button type="button" class="vehicle-modal-close" id="closeManualTripDetailsModal" aria-label="Close">×</button>
+    </div>
+    <div class="vehicle-modal-body">
+      <div class="form-group">
+        <label for="manualTripFrom">From</label>
+        <input type="text" id="manualTripFrom" placeholder="From">
+      </div>
+      <div class="form-group">
+        <label for="manualTripTo">To</label>
+        <input type="text" id="manualTripTo" placeholder="To">
+      </div>
+      <div class="form-group">
+        <label for="manualTripPurpose">Purpose</label>
+        <input type="text" id="manualTripPurpose" placeholder="Purpose">
+      </div>
+      <div class="form-group">
+        <label for="manualTripKm">KM</label>
+        <input type="number" id="manualTripKm" min="0" placeholder="KM">
+      </div>
+    </div>
+    <div class="vehicle-modal-footer">
+      <button type="button" id="cancelManualTripDetails" class="btn btn-outline">Cancel</button>
+      <button type="button" id="saveManualTripDetails" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.routelist-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.routelist-card {
+  background: #ffffff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  width: 100%;
+  max-width: 600px;
+}
+.routelist-card h2 {
+  margin-bottom: 10px;
+  color: #1f6f78;
+}
+.routelist-subtitle {
+  margin-bottom: 30px;
+  color: #666;
+}
+.routelist-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 20px;
+}
+.route-file-input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f9f9f9;
+}
+
+.route-dropzone {
+  border: 2px dashed #9cab7f;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  background: #fafafa;
+  transition: all 0.2s ease;
+}
+.route-dropzone:hover {
+  background: #f0f0f0;
+}
+.route-dropzone.dragover {
+  border-color: #b2452d;
+  background: #fff6f2;
+}
+.route-dropzone-filename {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+}
+.primary-btn {
+  min-height: 46px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background 0.2s;
+  background: #0b7285;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.primary-btn:hover { background: #095a69; }
+.primary-btn:focus { outline: 2px solid #0b7285; outline-offset: 2px; }
+.secondary-btn {
+  min-height: 46px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  background: #ffffff;
+  color: #374151;
+  border: 2px solid #e5e7eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.secondary-btn:hover { background: #f3f4f6; }
+.route-status {
+  margin-top: 20px;
+  font-size: 14px;
+}
+.routelist-verification-note {
+  background: #f8f9fb;
+  border-left: 4px solid #2d6cdf;
+  padding: 12px 16px;
+  margin: 15px 0 20px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: 6px;
+}
+.routelist-verification-note strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.routelist-template-download {
+  margin-bottom: 20px;
+}
+.routelist-template-download .secondary-btn {
+  display: inline-flex;
+  text-decoration: none;
+}
+.routelist-template-helper {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+}
+.routelist-upload-helper {
+  display: block;
+  margin-top: 6px;
+}
+
+.logbook-subtitle { color: #666; margin-bottom: 8px; }
+.logbook-intro { color: #666; margin-bottom: 8px; }
+.logbook-required-helper { font-size: 12px; color: #666; margin-bottom: 20px; }
+.required-label { font-size: 0.85em; font-weight: 600; color: #0b7285; margin-left: 4px; }
+.section-heading { margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 6px; font-size: 1rem; }
+.form-group { margin-bottom: 14px; }
+.logbook-card .form-group { margin-bottom: 12px; }
+.form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
+.form-group input[type="text"], .form-group input[type="number"], .form-group input[type="date"], .form-group select { width: 100%; max-width: 400px; padding: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: normal; }
+.checkbox-label input { width: auto; }
+.help-text { font-size: 12px; color: #666; display: block; margin-top: 4px; }
+/* Logbook: optional buttons row (space-between desktop, stack mobile) */
+.logbook-opt-helper { font-size: 12px; color: #666; margin: 10px 0 8px 0; }
+.logbook-opt-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+@media (min-width: 768px) {
+  .logbook-opt-buttons {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .logbook-opt-buttons { gap: 12px; }
+}
+/* Generate Logbook: price line + button */
+.logbook-cta { display: flex; flex-direction: column; align-items: flex-start; }
+.logbook-price-line { font-size: 17px; font-weight: 600; color: #0b7285; margin: 0 0 8px 0; }
+.logbook-card .form-actions {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+.logbook-card .form-actions .primary-btn {
+  min-height: 46px;
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  width: 100%;
+  max-width: 100%;
+}
+@media (min-width: 768px) {
+  .logbook-card .form-actions .primary-btn { width: auto; max-width: none; }
+}
+@media (min-width: 1024px) {
+  .logbook-card .form-actions .primary-btn { min-height: 36px; padding: 8px 14px; font-size: 14px; }
+  .logbook-card .primary-btn { min-height: 36px; padding: 8px 14px; font-size: 14px; }
+  .logbook-card .form-group input[type="text"],
+  .logbook-card .form-group input[type="number"],
+  .logbook-card .form-group input[type="date"],
+  .logbook-card .form-group select { height: 36px; padding: 6px 10px; font-size: 14px; box-sizing: border-box; }
+  .logbook-card .form-group { margin-bottom: 12px; }
+}
+@media (max-width: 767px) {
+  .logbook-card .form-actions { margin-top: 24px; }
+  .logbook-card .form-actions .primary-btn { width: 100%; }
+}
+.form-actions { margin-top: 20px; }
+.logbook-status { margin-top: 16px; font-size: 14px; }
+.tag-list { margin-top: 8px; font-size: 13px; color: #555; }
+
+/* Logbook modals: same structure and styles as Vehicle tab Add Vehicle modal */
+.vehicle-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+.vehicle-modal:not(.hidden) {
+  display: flex;
+}
+.vehicle-modal-content {
+  position: relative;
+  background: #ffffff;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+}
+@media (min-width: 769px) {
+  .vehicle-modal-content {
+    width: 500px;
+    max-width: 500px;
+  }
+}
+.vehicle-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: #0b7285;
+  border-bottom: 1px solid #0b7285;
+  border-radius: 8px 8px 0 0;
+}
+.vehicle-modal-header h3,
+.vehicle-modal-header .vehicle-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ffffff !important;
+  visibility: visible;
+  opacity: 1;
+}
+#leaveModal .vehicle-modal-header h3,
+#leaveModal .vehicle-modal-header .vehicle-modal-title,
+#manualTripModal .vehicle-modal-header h3,
+#manualTripModal .vehicle-modal-header .vehicle-modal-title {
+  color: #ffffff !important;
+}
+.select-leave-modal .vehicle-modal-content {
+  max-width: 520px;
+}
+.vehicle-modal-close {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.vehicle-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.vehicle-modal-body {
+  padding: 24px;
+}
+.vehicle-modal .form-group {
+  margin-bottom: 20px;
+}
+.vehicle-modal .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+.vehicle-modal .form-group input,
+.vehicle-modal .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+.vehicle-modal .form-group input:focus,
+.vehicle-modal .form-group select:focus {
+  border-color: #0b7285;
+  box-shadow: 0 0 0 3px rgba(11, 114, 133, 0.1);
+}
+.vehicle-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.vehicle-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+}
+/* Leave Days modal: premium finish */
+.select-leave-modal .modal-body {
+  overflow: visible !important;
+}
+.ct-calendar {
+  max-width: 520px;
+  margin: 0 auto;
+}
+.ct-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.ct-month-year {
+  display: flex;
+  gap: 10px;
+}
+.ct-month-year select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+.ct-nav-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+}
+.ct-weekdays,
+.ct-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+}
+.ct-weekdays div {
+  font-weight: 600;
+  color: #777;
+}
+.ct-calendar-grid div {
+  padding: 10px 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.ct-calendar-grid div:hover {
+  background: rgba(0, 128, 128, 0.1);
+}
+.ct-day-selected {
+  background: #1f7a83;
+  color: white;
+}
+.ct-day-drag-range {
+  background: #1f7a83;
+  color: white;
+}
+.select-leave-modal .leave-chips-label {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 12px 0 6px;
+  color: #374151;
+}
+.select-leave-modal #leaveDateList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+  margin-bottom: 12px;
+  min-height: 24px;
+}
+.select-leave-modal #leaveAddBtn.btn-primary {
+  margin-top: 16px;
+}
+.select-leave-modal .leave-day-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.select-leave-modal .leave-day-chip button {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1;
+}
+.select-leave-modal .leave-day-chip button:hover {
+  color: #dc2626;
+}
+@media (max-width: 640px) {
+  .vehicle-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .vehicle-modal .form-row {
+    grid-template-columns: 1fr;
+  }
+  .vehicle-modal-footer {
+    flex-direction: column;
+  }
+  .vehicle-modal-footer .btn {
+    width: 100%;
+  }
+}
+</style>

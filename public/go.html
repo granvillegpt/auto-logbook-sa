@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Redirecting…</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="/assets/logos/favicon.ico" sizes="32x32">
+</head>
+<body class="landing-page">
+  <main class="landing-main" style="padding: 3rem 1rem;">
+    <div class="container" style="max-width: 480px; text-align: center;">
+      <p id="goMessage">Redirecting…</p>
+    </div>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="/firebase/init.js"></script>
+  <script src="/js/firebase-init.js"></script>
+  <script>
+    (function () {
+      var msgEl = document.getElementById('goMessage');
+      function showInvalid() {
+        if (msgEl) msgEl.textContent = 'Invalid tool link';
+      }
+
+      var params = new URLSearchParams(window.location.search);
+      var toolId = params.get('tool');
+      if (!toolId || !toolId.trim()) {
+        showInvalid();
+        return;
+      }
+      toolId = toolId.trim();
+
+      var app = typeof firebase !== 'undefined' && firebase.apps && firebase.apps[0];
+      if (!app) {
+        showInvalid();
+        return;
+      }
+
+      var db = window.db;
+
+      function normalizeStatus(s) {
+        return (s || '').toString().toLowerCase().trim();
+      }
+
+      function websiteFromTool(tool) {
+        if (!tool) return '';
+        var w = tool.website && tool.website.trim();
+        if (w) return w;
+        var u = tool.url && tool.url.trim();
+        return u || '';
+      }
+
+      function redirectWithClick(collectionName, docId, website) {
+        return db.collection(collectionName).doc(docId).update({
+          clicks: firebase.firestore.FieldValue.increment(1)
+        }).then(function () {
+          db.collection('clickLogs').add({
+            toolId: docId,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            referrer: document.referrer
+          }).catch(function () {});
+          window.location.href = website;
+        });
+      }
+
+      db.collection('sponsoredTools').doc(toolId).get()
+        .then(function (doc) {
+          if (doc && doc.exists) {
+            var tool = doc.data();
+            if (tool.status !== 'live') {
+              document.body.innerHTML = 'Tool not available.';
+              return;
+            }
+            var website = websiteFromTool(tool);
+            if (!website) {
+              showInvalid();
+              return;
+            }
+            var href = /^https?:\/\//i.test(website) ? website : 'https://' + website;
+            return redirectWithClick('sponsoredTools', toolId, href);
+          }
+          showInvalid();
+        })
+        .catch(function () {
+          showInvalid();
+        });
+    })();
+  </script>
+</body>
+</html>

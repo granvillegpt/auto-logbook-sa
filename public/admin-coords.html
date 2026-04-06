@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin — Fix Coordinates</title>
+</head>
+<body>
+
+<h1>Fix Missing Coordinates</h1>
+
+<button id="loadBtn">Load Missing Stores</button>
+
+<table border="1" id="table">
+  <thead>
+    <tr>
+      <th>Store</th>
+      <th>Address</th>
+      <th>Lat</th>
+      <th>Lng</th>
+      <th>Save</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const ADMIN_KEY = "your-secret-key";
+
+// ================================
+// LOAD MISSING STORES
+// ================================
+document.getElementById("loadBtn").onclick = async () => {
+  const res = await fetch("/admin/missing-coords", {
+    headers: { "x-admin-key": ADMIN_KEY }
+  });
+
+  const stores = await res.json();
+  const tbody = document.querySelector("#table tbody");
+  tbody.innerHTML = "";
+
+  stores.forEach(store => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${store.customer}</td>
+      <td>${store.address}</td>
+      <td><input value="${store.lat || ""}" /></td>
+      <td><input value="${store.lng || ""}" /></td>
+      <td><button>Save</button></td>
+    `;
+
+    const btn = tr.querySelector("button");
+    btn.onclick = async () => {
+      const inputs = tr.querySelectorAll("input");
+
+      const lat = parseFloat(inputs[0].value);
+      const lng = parseFloat(inputs[1].value);
+
+      await fetch("/admin/update-coords", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": ADMIN_KEY
+        },
+        body: JSON.stringify({
+          normalizedQuery: store.normalizedQuery,
+          lat,
+          lng
+        })
+      });
+
+      alert("Saved");
+    };
+
+    tbody.appendChild(tr);
+  });
+};
+</script>
+
+</body>
+</html>

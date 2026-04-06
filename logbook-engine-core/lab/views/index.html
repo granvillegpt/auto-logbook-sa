@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logbook Engine Lab</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="file"],
+        select {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .form-text {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .tax-year-select {
+            width: 100%;
+            max-width: 500px;
+            padding: 12px 14px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .tax-year-select:focus {
+            outline: none;
+            border-color: #2e7d32;
+            box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.2);
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal.hidden {
+            display: none;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #leaveDateList li {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #leaveDateList li button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .calendar-day-header {
+            text-align: center;
+            font-weight: bold;
+            padding: 8px;
+            background-color: #f0f0f0;
+        }
+        .calendar-day {
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .calendar-day:hover {
+            background-color: #e3f2fd;
+        }
+        .calendar-day.selected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .calendar-day.other-month {
+            color: #ccc;
+        }
+        .calendar-day.today {
+            border: 2px solid #2196F3;
+        }
+        .calendar-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        .selected-date-tag {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            margin: 5px 5px 5px 0;
+            font-size: 12px;
+        }
+        .selected-date-tag .remove {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Logbook Engine Lab</h1>
+        
+        <form id="logbookForm" enctype="multipart/form-data" action="/run" method="POST">
+            <h2 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #2196F3; padding-bottom: 5px;">Taxpayer Information</h2>
+            
+            <div class="form-group">
+                <label for="firstName">First Name:</label>
+                <input type="text" id="firstName" name="firstName" required>
+            </div>
+
+            <div class="form-group">
+                <label for="surname">Surname:</label>
+                <input type="text" id="surname" name="surname" required>
+            </div>
+
+            <div class="form-group">
+                <label for="idNumber">Tax Number (optional):</label>
+                <input type="text" id="idNumber" name="idNumber" placeholder="Optional">
+            </div>
+
+            <h2 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #2196F3; padding-bottom: 5px;">Vehicle Information</h2>
+
+            <div class="form-group">
+                <label for="vehicleMake">Vehicle Make:</label>
+                <input type="text" id="vehicleMake" name="vehicleMake" required>
+            </div>
+
+            <div class="form-group">
+                <label for="vehicleModel">Vehicle Model:</label>
+                <input type="text" id="vehicleModel" name="vehicleModel" required>
+            </div>
+
+            <div class="form-group">
+                <label for="vehicleRegistration">Registration Number:</label>
+                <input type="text" id="vehicleRegistration" name="vehicleRegistration" required>
+            </div>
+
+            <div class="form-group">
+                <label for="vehicleYear">Vehicle Year (optional):</label>
+                <input type="text" id="vehicleYear" name="vehicleYear" placeholder="Optional">
+            </div>
+
+            <h2 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #2196F3; padding-bottom: 5px;">Logbook Details</h2>
+
+            <div class="form-group">
+                <label for="file">Excel Route List File:</label>
+                <input type="file" id="file" name="file" accept=".xlsx,.xls" required>
+                <div class="help-text">Required columns: Address, Mon, Tue, Wed, Thu, Fri (or Monday, Tuesday, etc.)</div>
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                    <input type="checkbox" id="workSaturdays" name="workSaturdays" style="width: auto; margin: 0;">
+                    <span>Permanently Work Saturdays</span>
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="homeAddress">Home Address:</label>
+                <input type="text" id="homeAddress" name="homeAddress" placeholder="Enter your home address" required>
+            </div>
+
+            <div class="form-group">
+                <label for="openingKm">Opening KM:</label>
+                <input type="number" id="openingKm" name="openingKm" min="0" value="50000" required>
+            </div>
+
+            <div class="form-group">
+                <label for="closingKm">Closing KM:</label>
+                <input type="number" id="closingKm" name="closingKm" min="0" required>
+                <div class="help-text">Required for private mileage calculation using Odometer Reconciliation Method</div>
+            </div>
+
+            <div class="form-group">
+                <label for="taxYear">Tax Year</label>
+                <select name="taxYear" id="taxYear" class="form-control tax-year-select" required></select>
+                <small class="form-text">
+                    SARS tax year runs from 1 March to 28 February
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="startDate">Start Date:</label>
+                <input type="date" id="startDate" name="startDate" required>
+            </div>
+
+            <div class="form-group">
+                <label for="endDate">End Date:</label>
+                <input type="date" id="endDate" name="endDate" required>
+            </div>
+
+            <div class="form-group">
+                <label for="employerName">Employer Name (optional):</label>
+                <input type="text" name="employerName" id="employerName" placeholder="Employer name (optional)">
+            </div>
+
+            <div class="form-group">
+                <label for="currentWeek">Current Week (1-4):</label>
+                <input type="number" id="currentWeek" name="currentWeek" min="1" max="4" value="1" required>
+            </div>
+
+            <div class="form-group">
+                <label for="leaveDays">Leave Days (optional):</label>
+                <button type="button" id="openLeaveModalBtn" style="background-color: #2196F3; margin-bottom: 10px;">📅 Select Leave Days</button>
+                <input type="hidden" id="leaveDaysInput" name="leaveDays" />
+            </div>
+
+            <div class="form-group">
+                <label for="manualTrips">Manual Trips (optional):</label>
+                <button type="button" id="openManualTripModalBtn" style="background-color: #4CAF50; margin-bottom: 10px;">➕ Add Manual Trip</button>
+                <input type="hidden" id="manualEntriesInput" name="manualEntries" />
+            </div>
+
+            <button type="submit" id="submitButton">Generate Logbook</button>
+        </form>
+    </div>
+
+    <!-- Leave Days Modal -->
+    <div id="leaveModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Select Leave Days</h3>
+            <div style="margin: 15px 0;">
+                <input id="leaveCalendar" type="text" placeholder="Select leave days" style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" />
+            </div>
+            <button type="button" id="closeLeaveModal" style="background-color: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 15px;">Done</button>
+        </div>
+    </div>
+
+    <!-- Manual Trip Modal -->
+    <div id="manualTripModal" class="modal hidden">
+        <div class="modal-content" style="width: 400px;">
+            <h3>Add Manual Trip</h3>
+            <div style="margin: 15px 0;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Date:</label>
+                <input type="date" id="manualTripDate" required style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;" />
+                
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Special Day Type (for zero-mileage days):</label>
+                <select id="manualTripSpecialDay" style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;">
+                    <option value="">None (Regular Trip)</option>
+                    <option value="Office Day">Office Day</option>
+                    <option value="Drove with Colleague">Drove with Colleague</option>
+                </select>
+                
+                <div id="regularTripFields">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">From Address:</label>
+                    <input type="text" id="manualTripFrom" style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;" />
+                    
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">To Address:</label>
+                    <input type="text" id="manualTripTo" style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;" />
+                    
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Distance (km) - Optional:</label>
+                    <input type="number" id="manualTripDistance" min="0" step="0.01" style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;" />
+                    
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Purpose:</label>
+                    <input type="text" id="manualTripPurpose" placeholder="e.g., Client Meeting" style="padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;" />
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="submitManualTrip" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; flex: 1;">Add Trip</button>
+                <button type="button" id="closeManualTripModal" style="background-color: #999; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; flex: 1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        // Leave Days - Initialize from localStorage
+        let leaveDays = JSON.parse(localStorage.getItem("leaveDays")) || [];
+
+        // Leave Days Modal - Flatpickr instance
+        let leavePicker;
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            // Populate tax year dropdown
+            populateTaxYearDropdown();
+
+            // Set default dates based on selected tax year (after a small delay to ensure dropdown is populated)
+            setTimeout(function() {
+                updateDatesFromTaxYear();
+            }, 10);
+
+            // Initialize Flatpickr for leave calendar
+            const modalContent = document.querySelector('#leaveModal .modal-content');
+            leavePicker = flatpickr("#leaveCalendar", {
+                mode: "multiple",
+                dateFormat: "Y-m-d",
+                allowInput: false,
+                appendTo: modalContent,
+                static: true
+            });
+
+            // Initialize leave days modal
+            initializeLeaveDaysModal();
+
+            // Initialize manual trip modal
+            initializeManualTripModal();
+        });
+
+        // Populate tax year dropdown with last 10 SARS tax years
+        function populateTaxYearDropdown() {
+            const select = document.getElementById("taxYear");
+            if (!select) return;
+            
+            select.innerHTML = "";
+
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth(); // 0 = Jan
+
+            // Determine current SARS tax year start
+            const sarsStartYear = currentMonth >= 2 ? currentYear : currentYear - 1;
+
+            for (let i = 0; i < 10; i++) {
+                const startYear = sarsStartYear - i;
+                const endYear = startYear + 1;
+
+                const option = document.createElement("option");
+
+                option.value = `${startYear}/${endYear}`;
+                option.textContent = `${startYear} / ${endYear} (1 Mar ${startYear} – 28 Feb ${endYear})`;
+
+                if (i === 0) {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            }
+            
+            // Trigger change event to update dates after populating
+            const changeEvent = new Event('change', { bubbles: true });
+            select.dispatchEvent(changeEvent);
+        }
+
+        // Update start/end dates when tax year changes
+        function updateDatesFromTaxYear() {
+            const taxYearSelect = document.getElementById('taxYear');
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            if (!taxYearSelect || !startDateInput || !endDateInput) return;
+
+            // Function to update dates based on selected tax year
+            function updateDates() {
+                const taxYear = taxYearSelect.value;
+                if (!taxYear || !taxYear.match(/^\d{4}\/\d{4}$/)) return;
+
+                const [startYear, endYear] = taxYear.split('/').map(Number);
+                
+                // Validate endYear = startYear + 1
+                if (endYear !== startYear + 1) return;
+
+                // Set dates: 1 March (startYear) to 28 February (endYear)
+                startDateInput.value = `${startYear}-03-01`;
+                endDateInput.value = `${endYear}-02-28`;
+            }
+
+            // Set initial dates immediately
+            updateDates();
+
+            // Update dates when tax year changes
+            taxYearSelect.addEventListener('change', updateDates);
+        }
+
+        // Leave Days Modal functionality
+        function initializeLeaveDaysModal() {
+            const openBtn = document.getElementById('openLeaveModalBtn');
+            const modal = document.getElementById('leaveModal');
+            const closeBtn = document.getElementById('closeLeaveModal');
+            const hiddenInput = document.getElementById('leaveDaysInput');
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            // Initialize hidden input with stored leave days
+            if (hiddenInput && leaveDays.length > 0) {
+                hiddenInput.value = JSON.stringify(leaveDays);
+            }
+
+            // Open modal
+            if (openBtn && modal) {
+                openBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Preload existing leave into calendar before showing modal
+                    if (leavePicker && leaveDays.length > 0) {
+                        leavePicker.setDate(leaveDays, false);
+                    }
+                    modal.classList.remove('hidden');
+                    // Set min/max dates based on start/end date range
+                    if (startDateInput && endDateInput && leavePicker) {
+                        const startDate = startDateInput.value;
+                        const endDate = endDateInput.value;
+                        if (startDate && endDate) {
+                            leavePicker.set('minDate', startDate);
+                            leavePicker.set('maxDate', endDate);
+                        }
+                    }
+                });
+            }
+
+            // Done button - collect selected dates
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function() {
+                    if (leavePicker) {
+                        const selectedDates = leavePicker.selectedDates.map(d =>
+                            d.getFullYear() + "-" +
+                            String(d.getMonth() + 1).padStart(2, "0") + "-" +
+                            String(d.getDate()).padStart(2, "0")
+                        );
+
+                        // Calendar state becomes authoritative
+                        leaveDays = selectedDates.sort();
+
+                        // Persist to localStorage
+                        localStorage.setItem("leaveDays", JSON.stringify(leaveDays));
+
+                        console.log("Leave days saved:", leaveDays);
+
+                        // Update hidden input for form submission
+                        if (hiddenInput) {
+                            hiddenInput.value = JSON.stringify(leaveDays);
+                        }
+                    }
+                    // Close modal
+                    modal.classList.add('hidden');
+                });
+            }
+
+            // Close on outside click
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.classList.add('hidden');
+                    }
+                });
+            }
+        }
+
+        // Manual Trip Modal functionality
+        let manualEntries = [];
+
+        function initializeManualTripModal() {
+            const openBtn = document.getElementById('openManualTripModalBtn');
+            const modal = document.getElementById('manualTripModal');
+            const closeBtn = document.getElementById('closeManualTripModal');
+            const submitBtn = document.getElementById('submitManualTrip');
+            const hiddenInput = document.getElementById('manualEntriesInput');
+            const dateInput = document.getElementById('manualTripDate');
+            const specialDaySelect = document.getElementById('manualTripSpecialDay');
+            const regularTripFields = document.getElementById('regularTripFields');
+            const fromInput = document.getElementById('manualTripFrom');
+            const toInput = document.getElementById('manualTripTo');
+            const distanceInput = document.getElementById('manualTripDistance');
+            const purposeInput = document.getElementById('manualTripPurpose');
+
+            // Load existing manual entries from hidden input if present
+            if (hiddenInput && hiddenInput.value) {
+                try {
+                    manualEntries = JSON.parse(hiddenInput.value);
+                    if (!Array.isArray(manualEntries)) {
+                        manualEntries = [];
+                    }
+                } catch (e) {
+                    manualEntries = [];
+                }
+            }
+
+            // Toggle regular trip fields based on special day selection
+            if (specialDaySelect && regularTripFields) {
+                specialDaySelect.addEventListener('change', function() {
+                    if (specialDaySelect.value) {
+                        // Special day selected - hide regular trip fields
+                        regularTripFields.style.display = 'none';
+                        // Make from/to not required
+                        if (fromInput) fromInput.removeAttribute('required');
+                        if (toInput) toInput.removeAttribute('required');
+                    } else {
+                        // Regular trip - show fields
+                        regularTripFields.style.display = 'block';
+                        // Make from/to required
+                        if (fromInput) fromInput.setAttribute('required', 'required');
+                        if (toInput) toInput.setAttribute('required', 'required');
+                    }
+                });
+            }
+
+            // Open modal
+            if (openBtn && modal) {
+                openBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    modal.classList.remove('hidden');
+                    // Clear form
+                    if (dateInput) dateInput.value = '';
+                    if (specialDaySelect) specialDaySelect.value = '';
+                    if (regularTripFields) regularTripFields.style.display = 'block';
+                    if (fromInput) {
+                        fromInput.value = '';
+                        fromInput.setAttribute('required', 'required');
+                    }
+                    if (toInput) {
+                        toInput.value = '';
+                        toInput.setAttribute('required', 'required');
+                    }
+                    if (distanceInput) distanceInput.value = '';
+                    if (purposeInput) purposeInput.value = '';
+                });
+            }
+
+            // Close modal
+            if (closeBtn && modal) {
+                closeBtn.addEventListener('click', function() {
+                    modal.classList.add('hidden');
+                });
+            }
+
+            // Close on outside click
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Submit manual trip
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function() {
+                    const date = dateInput ? dateInput.value : '';
+                    const specialDay = specialDaySelect ? specialDaySelect.value : '';
+                    const from = fromInput ? fromInput.value.trim() : '';
+                    const to = toInput ? toInput.value.trim() : '';
+                    const distance = distanceInput ? parseFloat(distanceInput.value) || 0 : 0;
+                    const purpose = purposeInput ? purposeInput.value.trim() : '';
+
+                    if (!date) {
+                        alert('Please fill in Date');
+                        return;
+                    }
+
+                    let manualEntry;
+
+                    if (specialDay) {
+                        // Zero-mileage special day entry
+                        manualEntry = {
+                            date: date,
+                            openingKm: null,
+                            closingKm: null,
+                            businessKm: 0,
+                            privateKm: 0,
+                            purpose: specialDay,
+                            from: null,
+                            to: null,
+                            day: new Date(date + 'T00:00:00').toLocaleDateString('en-ZA', { weekday: 'short' })
+                        };
+                    } else {
+                        // Regular manual trip
+                        if (!from || !to) {
+                            alert('Please fill in From Address and To Address for regular trips');
+                            return;
+                        }
+                        manualEntry = {
+                            date: date,
+                            openingKm: null,
+                            closingKm: null,
+                            businessKm: distance,
+                            privateKm: 0,
+                            purpose: "Manual Trip" + (purpose ? ` - ${purpose}` : ''),
+                            from: from,
+                            to: to,
+                            day: new Date(date + 'T00:00:00').toLocaleDateString('en-ZA', { weekday: 'short' })
+                        };
+                    }
+
+                    // Add to array
+                    manualEntries.push(manualEntry);
+
+                    // Update hidden input
+                    if (hiddenInput) {
+                        hiddenInput.value = JSON.stringify(manualEntries);
+                    }
+
+                    // Close modal
+                    modal.classList.add('hidden');
+
+                    // Clear form
+                    if (dateInput) dateInput.value = '';
+                    if (specialDaySelect) specialDaySelect.value = '';
+                    if (regularTripFields) regularTripFields.style.display = 'block';
+                    if (fromInput) {
+                        fromInput.value = '';
+                        fromInput.setAttribute('required', 'required');
+                    }
+                    if (toInput) {
+                        toInput.value = '';
+                        toInput.setAttribute('required', 'required');
+                    }
+                    if (distanceInput) distanceInput.value = '';
+                    if (purposeInput) purposeInput.value = '';
+                });
+            }
+        }
+
+        // Handle form submission
+        const logbookForm = document.getElementById('logbookForm');
+        if (logbookForm) {
+            logbookForm.addEventListener('submit', function(e) {
+                const button = document.getElementById('submitButton');
+                if (button) {
+                    button.disabled = true;
+                    button.textContent = 'Generating...';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+

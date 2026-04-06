@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logbook Engine Playground</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="file"] {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .totals {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        .totals pre {
+            margin: 0;
+            font-family: monospace;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Logbook Engine Playground</h1>
+    
+    <form id="logbookForm">
+        <div class="form-group">
+            <label for="excelFile">Excel Route List File:</label>
+            <input type="file" id="excelFile" accept=".xlsx,.xls" required>
+        </div>
+
+        <div class="form-group">
+            <label for="homeAddress">Home Address:</label>
+            <input type="text" id="homeAddress" placeholder="e.g., 123 Home Street, Cape Town" required>
+        </div>
+
+        <div class="form-group">
+            <label for="openingKm">Opening KM:</label>
+            <input type="number" id="openingKm" min="0" value="50000" required>
+        </div>
+
+        <div class="form-group">
+            <label for="startDate">Start Date:</label>
+            <input type="date" id="startDate" required>
+        </div>
+
+        <div class="form-group">
+            <label for="endDate">End Date:</label>
+            <input type="date" id="endDate" required>
+        </div>
+
+        <div class="form-group">
+            <label for="currentWeek">Current Week (1-4):</label>
+            <input type="number" id="currentWeek" min="1" max="4" value="1" required>
+        </div>
+
+        <button type="submit" id="runButton">Run Logbook Engine</button>
+    </form>
+
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div id="totals" class="totals" style="display: none;">
+        <h2>Totals</h2>
+        <pre id="totalsOutput"></pre>
+    </div>
+
+    <div id="entriesContainer" style="display: none;">
+        <h2>Logbook Entries</h2>
+        <table id="entriesTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Opening KM</th>
+                    <th>Closing KM</th>
+                    <th>Business KM</th>
+                </tr>
+            </thead>
+            <tbody id="entriesBody">
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Load SheetJS from CDN -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.full.min.js"></script>
+    <script type="module" src="playground.js"></script>
+</body>
+</html>
+
