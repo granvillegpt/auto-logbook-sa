@@ -4,3 +4,4 @@ node_modules/
 .firebaserc
 data/osm/
 *.pbf
+*.log
