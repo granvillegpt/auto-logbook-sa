@@ -33,26 +33,6 @@
       return Math.round(n * 100) / 100;
     }
 
-    async function getCouponDiscount(couponCode) {
-      var code = String(couponCode || '').trim().toUpperCase();
-      if (!code) return null;
-      try {
-        var db = window.db;
-        if (!db || !db.collection) return null;
-        const couponDoc = await db.collection("coupons").doc(code).get();
-        if (!couponDoc.exists) return null;
-        var couponData = couponDoc.data() || {};
-        if (couponData.active !== true) return null;
-        var type = String(couponData.type || '').toLowerCase();
-        var value = Number(couponData.value);
-        if (!Number.isFinite(value) || value < 0) return null;
-        if (type !== 'percent' && type !== 'fixed') return null;
-        return { code: code, type: type, value: value };
-      } catch (_err) {
-        return null;
-      }
-    }
-
     function uniquePaymentId() {
       if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
@@ -222,16 +202,7 @@
       }
       var finalAmount = amount;
       if (coupon) {
-        var discount = await getCouponDiscount(coupon);
-        if (discount) {
-          if (discount.type === 'percent') {
-            finalAmount = finalAmount - ((finalAmount * discount.value) / 100);
-          } else if (discount.type === 'fixed') {
-            finalAmount = finalAmount - discount.value;
-          }
-          finalAmount = Math.max(0, Math.round(finalAmount * 100) / 100);
-          fields.custom_str5 = discount.code;
-        }
+        fields.custom_str5 = String(coupon).toUpperCase();
       }
       fields.amount = finalAmount.toFixed(2);
       fields.item_name = item_name;
@@ -251,6 +222,7 @@
       return;
     }
 
+    console.log("FINAL AMOUNT SENT:", fields.amount);
     Object.keys(fields).forEach(key => {
       const input = document.createElement('input');
       input.type = 'hidden';
