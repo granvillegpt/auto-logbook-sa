@@ -7,6 +7,12 @@ require("dotenv").config({ path: __dirname + "/../.env" });
 const path = require("path");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const db = admin.firestore();
+const { FieldValue } = require("firebase-admin/firestore");
 
 const express = require("express");
 const { generateLogbook } = require("../engineAdapter");
@@ -240,6 +246,88 @@ const logbookAccessState = async (req, res) => {
 
 app.post("/api/logbookAccessState", logbookAccessState);
 app.post('/logbookAccessState', logbookAccessState);
+
+app.post("/api/submit-review", async (req, res) => {
+  try {
+    const { name, company, rating, comment } = req.body;
+
+    if (!rating || !comment) {
+      return res.status(400).json({ success: false, error: "Missing required fields" });
+    }
+
+    await admin.firestore().collection("reviews_pending").add({
+      name: name || "",
+      company: company || "",
+      rating: Number(rating),
+      comment: String(comment).trim(),
+      status: "pending",
+      createdAt: new Date()
+    });
+
+    // TEMP: remove increment (avoid FieldValue crash)
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Submit review error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/submit-ad", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const title =
+      (body.title != null && String(body.title).trim() !== "")
+        ? String(body.title).trim()
+        : (body.toolName != null && String(body.toolName).trim() !== "")
+          ? String(body.toolName).trim()
+          : "";
+    const image = typeof body.image === "string" ? body.image.trim() : "";
+    const slot = body.slot != null && String(body.slot).trim() !== "" ? String(body.slot).trim() : "";
+
+    if (!title) {
+      return res.status(400).json({ success: false, error: "Missing title" });
+    }
+    if (!image) {
+      return res.status(400).json({ success: false, error: "Missing image" });
+    }
+    if (!slot) {
+      return res.status(400).json({ success: false, error: "Missing slot" });
+    }
+
+    await db.collection("sponsoredTools").add({
+      ...body,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Submit ad error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/update-pricing", async (req, res) => {
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    await db
+      .collection("pricing")
+      .doc("default")
+      .set(
+        {
+          ...body,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Update pricing error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 app.post(["/api/admin/upload-stores", "/admin/upload-stores"], async (req, res) => {
   console.log("🔥 UPLOAD STORES HIT");

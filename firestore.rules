@@ -2,10 +2,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow everything for local emulator testing
-    match /{document=**} {
-      allow read, write: if true;
+    // Public read only
+    match /storeLocations/{docId} {
+      allow read: if true;
+      allow write: if false;
     }
 
+    match /storeResolution/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Payment tokens — backend only
+    match /logbook_tokens/{docId} {
+      allow read, write: if false;
+    }
+
+    match /reviews_approved/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /pricing/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /coupons/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /sponsoredTools/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /system/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Default — block everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }

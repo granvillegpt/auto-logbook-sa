@@ -193,7 +193,9 @@
 
   function setSuccess(msg) {
     if (successEl) {
-      successEl.textContent = msg || 'Submitted successfully.';
+      var text = msg || 'Submitted successfully.';
+      successEl.innerHTML =
+        '<div class="success-message">' + escapeHtmlPreview(text) + '</div>';
       successEl.style.display = 'block';
     }
     if (errorEl) errorEl.textContent = '';
@@ -658,22 +660,35 @@
         months: selectedMonths,
         amount: amount,
         pricePerMonth: pricePerMonth,
-        status: 'pending',
         emailSent: false,
         endDate: null,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         imagePosition: { x: ipx, y: ipy },
         positionX: ipx,
         positionY: ipy
       };
 
-      await db.collection('sponsoredTools').add(payload);
-      console.log('🔥 FIRESTORE WRITE SUCCESS');
+      var submitRes = await fetch('/api/submit-ad', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      var submitData = {};
+      try {
+        submitData = await submitRes.json();
+      } catch (_e) {
+        throw new Error('Submission failed. Please try again.');
+      }
+      if (!submitRes.ok || !submitData.success) {
+        throw new Error((submitData && submitData.error) ? submitData.error : 'Submission failed. Please try again.');
+      }
+      console.log('🔥 AD SUBMIT SUCCESS');
       setSuccess('Submitted successfully. We will review your ad.');
       form.reset();
       clearPreview();
     } catch (err) {
-      console.error('🔥 FIRESTORE WRITE ERROR', err);
+      console.error('🔥 AD SUBMIT ERROR', err);
       setError((err && err.message) ? err.message : 'Submission failed. Please try again.');
     } finally {
       setSubmitting(false);

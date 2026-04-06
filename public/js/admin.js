@@ -988,7 +988,22 @@ function initPricingSave() {
 
       console.log("📦 Payload:", payload);
 
-      await db.collection("pricing").doc("default").set(payload, { merge: true });
+      const saveRes = await fetch("/api/update-pricing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      let saveData = {};
+      try {
+        saveData = await saveRes.json();
+      } catch (_e) {
+        throw new Error("Save failed");
+      }
+      if (!saveRes.ok || !saveData.success) {
+        throw new Error((saveData && saveData.error) ? saveData.error : "Save failed");
+      }
 
       console.log("✅ Pricing saved successfully");
       if (statusEl) statusEl.textContent = 'Saved successfully.';

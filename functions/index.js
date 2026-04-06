@@ -101,11 +101,24 @@ function expiresAtToMs(v) {
 exports.payfastNotify = onRequest(
   {
     region: "us-central1",
-    secrets: [SENDGRID_API_KEY],
+    secrets: [SENDGRID_API_KEY, payfastPassphrase],
   },
   async (req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== "object") {
+      return res.status(400).send("Invalid payload");
+    }
+    const passphrase = process.env.PAYFAST_PASSPHRASE || "";
+    const generated = generateSignature(body, passphrase);
+    const received = body.signature;
+    if (
+      !received ||
+      String(generated).toLowerCase() !== String(received).toLowerCase()
+    ) {
+      return res.status(400).send("Invalid signature");
+    }
     res.status(200).send("OK");
-    processPayfastPayment(req.body).catch(console.error);
+    processPayfastPayment(body).catch(console.error);
   }
 );
 
