@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Complete Payment</title>
+  <link rel="icon" href="/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -15,12 +17,16 @@
     </div>
   </div>
 
-  <form id="payfastForm" method="post"></form>
+  <form id="payfastForm" name="payfast_form" method="post" action="https://www.payfast.co.za/eng/process"></form>
 
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
   <script src="/firebase/init.js"></script>
   <script src="/js/payfast-config.js"></script>
+  <!-- MD5 library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
   <script>
     function parsePositiveInt(value) {
       var n = parseInt(String(value == null ? '' : value).trim(), 10);
@@ -40,6 +46,111 @@
       return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 12);
     }
 
+    /* =========================
+       PAYFAST SIGNATURE BLOCK
+       ========================= */
+
+    /**
+     * Custom / hosted checkout signatures use documentation field order, not
+     * alphabetical order (alphabetical is for API only). See PayFast docs
+     * step_2_signature and payfast-php-sdk discussions.
+     */
+    const PAYFAST_CHECKOUT_SIGNATURE_FIELD_ORDER = [
+      "merchant_id",
+      "merchant_key",
+      "return_url",
+      "cancel_url",
+      "notify_url",
+      "name_first",
+      "name_last",
+      "email_address",
+      "cell_number",
+      "m_payment_id",
+      "amount",
+      "item_name",
+      "item_description",
+      "custom_int1",
+      "custom_int2",
+      "custom_int3",
+      "custom_int4",
+      "custom_int5",
+      "custom_str1",
+      "custom_str2",
+      "custom_str3",
+      "custom_str4",
+      "custom_str5",
+      "email_confirmation",
+      "confirmation_address",
+      "payment_method",
+      "subscription_type",
+      "billing_date",
+      "recurring_amount",
+      "frequency",
+      "cycles"
+    ];
+
+    function payfastSortKeys(keys) {
+      const priority = PAYFAST_CHECKOUT_SIGNATURE_FIELD_ORDER;
+      const priorityDict = {};
+      for (var i = 0; i < priority.length; i++) {
+        priorityDict[priority[i]] = i;
+      }
+      return keys.slice().sort(function (a, b) {
+        var ia = priorityDict.hasOwnProperty(a) ? priorityDict[a] : priority.length;
+        var ib = priorityDict.hasOwnProperty(b) ? priorityDict[b] : priority.length;
+        if (ia !== ib) return ia - ib;
+        return String(a).localeCompare(String(b));
+      });
+    }
+
+    function generatePayfastSignature(fields, passphrase = "") {
+      fields.amount = Number(fields.amount).toFixed(2);
+
+      const data = { ...fields };
+      delete data.signature;
+
+      const keys = payfastSortKeys(Object.keys(data)).filter(function (key) {
+        var v = data[key];
+        if (v === undefined || v === null) return false;
+        if (String(v).trim() === "") return false;
+        return true;
+      });
+
+      const paramString = keys
+        .map(function (key) {
+          return (
+            key +
+            "=" +
+            encodeURIComponent(String(data[key])).replace(/%20/g, "+")
+          );
+        })
+        .join("&");
+
+      const finalString = passphrase
+        ? paramString + "&passphrase=" + encodeURIComponent(passphrase).replace(/%20/g, "+")
+        : paramString;
+
+      console.log("---- PAYFAST DEBUG ----");
+      console.log("FIELDS:", JSON.stringify(fields, null, 2));
+      console.log("PARAM STRING:", paramString);
+      console.log("FINAL STRING:", finalString);
+      console.log("SIGNATURE:", md5(finalString));
+      console.log("------------------------");
+
+      return md5(finalString);
+    }
+
+    function stripEmptyPayfastFields(obj) {
+      var out = {};
+      Object.keys(obj).forEach(function (k) {
+        var v = obj[k];
+        if (v === undefined || v === null) return;
+        if (String(v).trim() === "") return;
+        out[k] = v;
+      });
+      return out;
+    }
+
     const params = new URLSearchParams(window.location.search);
     let product = String(params.get('product') || '').trim().toLowerCase();
     const adIdRaw = params.get('adId');
@@ -52,7 +163,7 @@
     const config = window.PAYFAST_CONFIG;
     const form = document.getElementById('payfastForm');
     form.action = config.sandbox
-      ? "https://sandbox.payfast.co.za/eng/process"
+      ? "https://www.payfast.co.za/eng/process"
       : "https://www.payfast.co.za/eng/process";
 
     const baseReturn = String(
@@ -69,7 +180,7 @@
       notify_url: config.notify_url,
       m_payment_id: uniquePaymentId(),
       return_url: `${origin}/payment-success.html?product=logbook`,
-      cancel_url: `${origin}/logbook.html`,
+      cancel_url: `${origin}/`,
     };
 
     async function processPayment() {
@@ -173,7 +284,7 @@
       fields.cancel_url = origin + '/payment-cancel.html?product=ad';
       console.log('PAYMENT AD ID:', adId);
     } else if (product === 'logbook') {
-      const paymentId = String(params.get('custom_str1') || '').trim();
+      const pf_payment_id = String(params.get('custom_str1') || '').trim();
       let email = String(params.get('email') || '').trim();
       const custom_str3 = params.get('custom_str3');
       const tokensRaw = params.get('tokens') || params.get('custom_str4');
@@ -181,7 +292,7 @@
       const amount = toAmount(params.get('amount'));
       const item_name = params.get('item_name') || 'Logbook Generation';
       const coupon = String(params.get('coupon') || '').trim();
-      if (!paymentId) {
+      if (!pf_payment_id) {
         document.querySelector('.payment-redirect-card').innerHTML =
           '<h2>Invalid payment link</h2><p>Missing logbook payment details.</p>';
         return;
@@ -207,12 +318,13 @@
       fields.amount = finalAmount.toFixed(2);
       fields.item_name = item_name;
       fields.email_address = email;
-      fields.custom_str1 = paymentId;
+      fields.custom_str1 = pf_payment_id;
+      fields.m_payment_id = pf_payment_id;
       fields.custom_str2 = 'logbook';
       if (custom_str3) fields.custom_str3 = custom_str3;
       if (tokens) fields.custom_str4 = String(tokens);
       fields.return_url = `${origin}/payment-success.html?product=logbook`;
-      fields.cancel_url = `${origin}/logbook.html`;
+      fields.cancel_url = `${origin}/`;
       try {
         localStorage.setItem("userEmail", email);
       } catch (_e) {}
@@ -222,12 +334,41 @@
       return;
     }
 
-    console.log("FINAL AMOUNT SENT:", fields.amount);
-    Object.keys(fields).forEach(key => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
+    const normalize = (v) => {
+      if (v === undefined || v === null) return "";
+      return String(v).trim();
+    };
+
+    const pf = {
+      merchant_id: normalize(config.merchant_id),
+      merchant_key: normalize(config.merchant_key),
+      m_payment_id: normalize(fields.m_payment_id),
+      amount: Number(fields.amount).toFixed(2),
+      item_name: normalize(fields.item_name),
+      notify_url: normalize(fields.notify_url),
+      return_url: normalize(fields.return_url),
+      cancel_url: normalize(fields.cancel_url),
+      email_address: normalize(fields.email_address),
+      custom_str1: normalize(fields.custom_str1),
+      custom_str2: normalize(fields.custom_str2),
+      custom_str3: normalize(fields.custom_str3),
+      custom_str4: normalize(fields.custom_str4),
+      custom_str5: normalize(fields.custom_str5)
+    };
+
+    const pfForPost = stripEmptyPayfastFields(pf);
+    pfForPost.signature = generatePayfastSignature(
+      pfForPost,
+      config.passphrase || ""
+    );
+
+    console.log("FINAL AMOUNT SENT:", pfForPost.amount);
+
+    Object.keys(pfForPost).forEach(function (key) {
+      const input = document.createElement("input");
+      input.type = "hidden";
       input.name = key;
-      input.value = fields[key] != null ? fields[key] : '';
+      input.value = pfForPost[key];
       form.appendChild(input);
     });
 

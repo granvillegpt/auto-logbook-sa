@@ -48,9 +48,10 @@ async function isValidLogbookToken(token) {
 /**
  * Atomically decrement remaining by 1 once per requestId. Admin path must not call this.
  * @param {string|null|undefined} requestId Client X-Request-Id (e.g. crypto.randomUUID); repeats are no-ops.
- * @throws {Error} Invalid token | Token already used | Invalid token state
+ * @throws {Error} Invalid token | No tokens remaining | Invalid token state
  */
 async function consumeLogbookToken(token, requestId) {
+  console.log("🔥 CONSUME CALLED WITH TOKEN:", token, "REQUEST ID:", requestId);
   const t = String(token || "").trim();
   if (!t) {
     throw new Error("Invalid token");
@@ -72,37 +73,33 @@ async function consumeLogbookToken(token, requestId) {
     }
 
     const data = snap.data() || {};
-    const remaining = remainingFromDocData(data);
-    const rawRequests =
+    const remaining = Number(data.remaining || 0);
+    console.log("🔥 TOKEN DOC:", data);
+    console.log("🔥 REMAINING BEFORE:", remaining);
+
+    if (remaining <= 0) {
+      throw new Error("No tokens remaining");
+    }
+
+    const rawUr =
       data.usedRequests && typeof data.usedRequests === "object" && !Array.isArray(data.usedRequests)
         ? data.usedRequests
         : {};
-
-    const entries = Object.entries(rawRequests);
-    const trimmed = entries.slice(-20);
-    const usedRequests = Object.fromEntries(trimmed);
+    const usedRequests = { ...rawUr };
 
     if (rid && usedRequests[rid]) {
       return;
     }
 
-    if (remaining <= 0) {
-      throw new Error("Token already used");
-    }
+    const nextUsed = rid ? Object.assign({}, usedRequests, { [rid]: true }) : usedRequests;
+    const trimmedUsed = Object.fromEntries(Object.entries(nextUsed).slice(-20));
 
-    if (remaining > 100) {
-      throw new Error("Invalid token state");
-    }
-
-    const patch = {
+    tx.update(ref, {
       remaining: remaining - 1,
       lastUsedAt: Date.now(),
-    };
-    if (rid) {
-      const merged = Object.assign({}, usedRequests, { [rid]: true });
-      patch.usedRequests = Object.fromEntries(Object.entries(merged).slice(-20));
-    }
-    tx.update(ref, patch);
+      usedRequests: trimmedUsed,
+    });
+    console.log("🔥 REMAINING AFTER:", remaining - 1);
   });
 }
 
@@ -128,12 +125,7 @@ function getLogbookAccessTokenFromRequest(req) {
   return "";
 }
 
-function getRequestIdFromHttpRequest(req) {
-  const h = req.headers["x-request-id"];
-  return h != null ? String(h).trim() : "";
-}
-
-/** For /api/generateLogbook and logbookAccessState: allow retry with same X-Request-Id after consume. */
+/** For /api/generateLogbook and logbookAccessState: doc must exist and remaining > 0. */
 async function logbookTokenAllowsGenerateHttp(req, token) {
   const t = String(token || "").trim();
   if (!t) return false;
@@ -141,15 +133,13 @@ async function logbookTokenAllowsGenerateHttp(req, token) {
   const doc = await admin.firestore().collection("logbook_tokens").doc(t).get();
   if (!doc.exists) return false;
   const data = doc.data() || {};
-  const remaining = remainingFromDocData(data);
-  if (remaining > 0) return true;
-  const rid = getRequestIdFromHttpRequest(req);
-  if (!rid || rid.length > 200) return false;
-  const usedRequests =
-    data.usedRequests && typeof data.usedRequests === "object" && !Array.isArray(data.usedRequests)
-      ? data.usedRequests
-      : {};
-  return !!usedRequests[rid];
+  const remaining = Number(data.remaining || 0);
+
+  if (remaining <= 0) {
+    return false; // 🚨 HARD LOCK
+  }
+
+  return true;
 }
 
 async function assertResolveStoreAllowedHttp(req, adminKeySecret) {
@@ -211,6 +201,32 @@ async function evaluateLogbookAccessHttp(req) {
   return { canGenerate: true, isAdmin: false, reason: null };
 }
 
+function isAdminDashboardRequest(req) {
+  return req.headers["x-admin-dashboard"] === "true";
+}
+
+async function isAdminRequest(req) {
+  try {
+    const raw = req.headers.authorization || req.headers.Authorization || "";
+    const m = String(raw).match(/^Bearer\s+(\S+)/i);
+    if (!m) {
+      return false;
+    }
+
+    const idToken = m[1];
+    ensureAdminApp();
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    console.log("ADMIN CHECK EMAIL:", decoded.email);
+
+    const adminEmails = ["granvillepowell@icloud.com"];
+
+    return adminEmails.includes(decoded.email);
+  } catch (err) {
+    console.error("ADMIN CHECK FAILED:", err && err.message ? String(err.message) : err);
+    return false;
+  }
+}
+
 module.exports = {
   isAdminUser,
   isValidLogbookToken,
@@ -220,5 +236,8 @@ module.exports = {
   getDecodedIdTokenFromRequest,
   getLogbookAccessTokenFromRequest,
   evaluateLogbookAccessHttp,
+  logbookTokenAllowsGenerateHttp,
   consumeLogbookToken,
+  isAdminRequest,
+  isAdminDashboardRequest,
 };

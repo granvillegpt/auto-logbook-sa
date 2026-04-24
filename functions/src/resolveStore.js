@@ -25,8 +25,9 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const STORE_LOCATIONS = "store_locations";
-/** Doc id = sha256(canonical key); same resolved fields as API response for cache lookups. */
+/** Authoritative permanent store rows (canonicalName query + doc id aligned with admin approval). */
+const STORE_LOCATIONS = "storeLocations";
+/** Doc id = sha256(normalized input); optional non-authoritative memo / negative cache only. */
 const STORE_RESOLUTION_COLLECTION = "storeResolution";
 /** @deprecated Alias for admin upload / index — same collection as STORE_RESOLUTION_COLLECTION. */
 const API_CACHE_STORE_RESOLUTION = STORE_RESOLUTION_COLLECTION;
@@ -38,7 +39,7 @@ function sha256(utf8String) {
     .digest("hex");
 }
 
-/** In-memory resolver cache: normalized key → success payload or negative marker. */
+/** In-memory resolver cache: normalized key → negative marker only (success always re-checks storeLocations). */
 const __resolverMemoryCache = new Map();
 
 /**
@@ -62,6 +63,25 @@ function resolverCacheDocIdFromUserInput(userInput) {
 
 /** ~center of South Africa for Find Place location bias (metres, lat, lng). */
 const SA_LOCATION_BIAS = "circle:500000@-28.5,25.0";
+
+const REGION_MAP = {
+  western_cape: {
+    bias: "circle:250000@-33.9249,18.4241",
+    province: "western cape"
+  },
+  eastern_cape: {
+    bias: "circle:300000@-32.2968,26.4194",
+    province: "eastern cape"
+  },
+  gauteng: {
+    bias: "circle:150000@-26.2041,28.0473",
+    province: "gauteng"
+  },
+  garden_route: {
+    bias: "circle:150000@-34.0351,23.0465",
+    province: "western cape"
+  }
+};
 
 async function runWithConcurrency(items, limit, iteratee) {
   if (!items || items.length === 0) return [];
@@ -453,21 +473,33 @@ function googleFormattedAddressLooksSouthAfrican(formatted) {
 }
 
 /**
- * Find Place (ZA bias) → Text Search (region=za) → Place Details.
+ * Text Search (region=za) → Find Place (ZA bias) if no result → Place Details.
  * Returns enriched result or null on failure / invalid SA address.
  */
-async function fetchGooglePlaceResult(searchInput, apiKey, trace) {
-  const findPlaceUrl =
-    `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
-    `?input=${encodeURIComponent(searchInput)}` +
-    `&inputtype=textquery` +
-    `&fields=place_id,name` +
-    `&locationbias=${encodeURIComponent(SA_LOCATION_BIAS)}` +
+async function fetchGooglePlaceResult(searchInput, apiKey, trace, selectedRegions = ["south_africa"], alreadyRetried = false) {
+  let bias = SA_LOCATION_BIAS;
+  if (selectedRegions && selectedRegions.length === 1) {
+    const regionKey = selectedRegions[0];
+    if (REGION_MAP[regionKey]) {
+      bias = REGION_MAP[regionKey].bias;
+    }
+  }
+
+  console.log(
+    "[AUDIT] Final query sent to Places API (textsearch primary):",
+    JSON.stringify(searchInput)
+  );
+  console.log("[AUDIT] API used: google_places_textsearch");
+
+  const textUrl =
+    `https://maps.googleapis.com/maps/api/place/textsearch/json` +
+    `?query=${encodeURIComponent(searchInput)}` +
+    `&region=za` +
     `&key=${apiKey}`;
 
   if (trace && Array.isArray(trace.apiCalls)) {
     trace.apiCalls.push({
-      api: "google_places_findplace",
+      api: "google_places_textsearch",
       input: searchInput
     });
   }
@@ -475,60 +507,70 @@ async function fetchGooglePlaceResult(searchInput, apiKey, trace) {
   let placeId = null;
 
   try {
-    const findRes = await fetch(findPlaceUrl);
-    const findData = await findRes.json();
+    const textRes = await fetch(textUrl);
+    const textData = await textRes.json();
 
-    console.log("GOOGLE API RESPONSE STATUS:", {
-      status: findData.status,
-      candidatesCount: findData.candidates ? findData.candidates.length : 0
+    console.log("GOOGLE TEXT SEARCH STATUS:", {
+      status: textData.status,
+      resultsCount: textData.results ? textData.results.length : 0
     });
 
     if (
-      findData.status === "OK" &&
-      findData.candidates &&
-      findData.candidates.length > 0 &&
-      findData.candidates[0].place_id
+      textData.status === "OK" &&
+      textData.results &&
+      textData.results.length > 0 &&
+      textData.results[0].place_id
     ) {
-      placeId = findData.candidates[0].place_id;
+      placeId = textData.results[0].place_id;
     }
   } catch (e) {
-    console.error("google_places_findplace network error:", e);
-    return null;
+    console.error("google_places_textsearch network error:", e);
   }
 
   if (!placeId) {
-    const textUrl =
-      `https://maps.googleapis.com/maps/api/place/textsearch/json` +
-      `?query=${encodeURIComponent(searchInput)}` +
-      `&region=za` +
+    console.log(
+      "[AUDIT] Fallback triggered: textsearch returned no results"
+    );
+    console.log(
+      "[AUDIT] Final query sent to Places API (findplace fallback):",
+      JSON.stringify(searchInput)
+    );
+    console.log("[AUDIT] API used: google_places_findplacefromtext");
+
+    const findPlaceUrl =
+      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
+      `?input=${encodeURIComponent(searchInput)}` +
+      `&inputtype=textquery` +
+      `&fields=place_id,name` +
+      `&locationbias=${encodeURIComponent(bias)}` +
       `&key=${apiKey}`;
 
     if (trace && Array.isArray(trace.apiCalls)) {
       trace.apiCalls.push({
-        api: "google_places_textsearch",
+        api: "google_places_findplace",
         input: searchInput
       });
     }
 
     try {
-      const textRes = await fetch(textUrl);
-      const textData = await textRes.json();
+      const findRes = await fetch(findPlaceUrl);
+      const findData = await findRes.json();
 
-      console.log("GOOGLE TEXT SEARCH STATUS:", {
-        status: textData.status,
-        resultsCount: textData.results ? textData.results.length : 0
+      console.log("GOOGLE API RESPONSE STATUS:", {
+        status: findData.status,
+        candidatesCount: findData.candidates ? findData.candidates.length : 0
       });
 
       if (
-        textData.status === "OK" &&
-        textData.results &&
-        textData.results.length > 0 &&
-        textData.results[0].place_id
+        findData.status === "OK" &&
+        findData.candidates &&
+        findData.candidates.length > 0 &&
+        findData.candidates[0].place_id
       ) {
-        placeId = textData.results[0].place_id;
+        placeId = findData.candidates[0].place_id;
       }
     } catch (e) {
-      console.error("google_places_textsearch network error:", e);
+      console.error("google_places_findplace network error:", e);
       return null;
     }
   }
@@ -537,6 +579,7 @@ async function fetchGooglePlaceResult(searchInput, apiKey, trace) {
     return null;
   }
 
+  console.log("[AUDIT] API used: google_places_details");
   const detailsUrl =
     `https://maps.googleapis.com/maps/api/place/details/json` +
     `?place_id=${encodeURIComponent(placeId)}` +
@@ -570,6 +613,13 @@ async function fetchGooglePlaceResult(searchInput, apiKey, trace) {
       ? result.formatted_address.trim()
       : "";
 
+  const provinceComponent = (result.address_components || []).find(c =>
+    c.types && c.types.includes("administrative_area_level_1")
+  );
+  const province = provinceComponent && provinceComponent.long_name
+    ? String(provinceComponent.long_name).toLowerCase()
+    : "";
+
   const country = getComponent(result.address_components, ["country"]);
 
   if (!country || country.toLowerCase() !== "south africa") {
@@ -583,6 +633,33 @@ async function fetchGooglePlaceResult(searchInput, apiKey, trace) {
       _resolved: false,
       resolutionStatus: "not_found"
     };
+  }
+
+  if (selectedRegions && selectedRegions.length > 0 && selectedRegions[0] !== "south_africa") {
+    const allowed = selectedRegions.some(regionKey => {
+      const region = REGION_MAP[regionKey];
+      return region && province.includes(region.province);
+    });
+
+    if (!allowed) {
+      if (trace && Array.isArray(trace.steps)) {
+        trace.steps.push("Rejected: outside selected region → " + province);
+      }
+      if (!alreadyRetried && selectedRegions && selectedRegions.length > 0) {
+        const regionName = selectedRegions[0].replace("_", " ");
+        const retryQuery = searchInput + " " + regionName;
+        if (trace && Array.isArray(trace.steps)) {
+          trace.steps.push("Retry with region: " + retryQuery);
+        }
+        console.log("[AUDIT] Fallback triggered: wrong_region retry");
+        console.log("[AUDIT] Fallback query:", JSON.stringify(retryQuery));
+        return await fetchGooglePlaceResult(retryQuery, apiKey, trace, selectedRegions, true);
+      }
+      return {
+        _resolved: false,
+        resolutionStatus: "wrong_region"
+      };
+    }
   }
 
   let structured;
@@ -614,9 +691,18 @@ function logStoreResolutionAudit(trace) {
 }
 
 function buildResolverQueryAttempts(raw, cleaned) {
+  console.log(
+    "[AUDIT] Before buildResolverQueryAttempts:",
+    "raw=",
+    JSON.stringify(raw),
+    "cleaned=",
+    JSON.stringify(cleaned)
+  );
   const attempts = [];
   const seen = new Set();
   const add = (s) => {
+    const beforeAdd = String(s || "").trim();
+    console.log("[AUDIT] Before buildResolverQueryAttempts add():", JSON.stringify(beforeAdd));
     let q = String(s || "")
       .trim()
       .replace(/\s+/g, " ")
@@ -629,6 +715,7 @@ function buildResolverQueryAttempts(raw, cleaned) {
     const k = q.toLowerCase();
     if (seen.has(k)) return;
     seen.add(k);
+    console.log("[AUDIT] After buildResolverQueryAttempts add():", JSON.stringify(q));
     attempts.push(q);
   };
   const base = cleaned || raw;
@@ -636,6 +723,7 @@ function buildResolverQueryAttempts(raw, cleaned) {
   if (String(cleaned || "").trim() !== String(raw).trim()) {
     add(raw);
   }
+  console.log("[AUDIT] After buildResolverQueryAttempts:", JSON.stringify(attempts));
   return attempts;
 }
 
@@ -688,6 +776,7 @@ function cachePayloadFromFirestore(data, raw) {
 
 async function resolveStoreName(storeName, options = {}) {
   const raw = String(storeName || "").trim();
+  console.log("[AUDIT] Original storeName input:", JSON.stringify(raw));
   console.log("=== RESOLVER START ===", { raw });
   if (!raw) return null;
 
@@ -711,18 +800,20 @@ async function resolveStoreName(storeName, options = {}) {
       logStoreResolutionAudit(trace);
       return null;
     }
-    trace.finalSource = "memory_hit";
-    logStoreResolutionAudit(trace);
-    return entry.value;
+    // Positive memory entries are not returned here — storeLocations must stay authoritative.
   }
 
+  console.log("[AUDIT] Before normalizeStoreName:", JSON.stringify(raw));
   const canonical = normalizeStoreName(raw);
   trace.canonical = canonical;
+  console.log("[AUDIT] After normalizeStoreName:", JSON.stringify(canonical));
 
   const isTooShort = raw.length < 3;
   const isDigitsOnly = /^\d+$/.test(raw);
+  console.log("[AUDIT] Before cleanStoreName:", JSON.stringify(raw));
   const cleaned =
     isTooShort || isDigitsOnly ? raw : cleanStoreName(raw);
+  console.log("[AUDIT] After cleanStoreName:", JSON.stringify(cleaned));
 
   let existingRef = null;
   let existing = null;
@@ -779,10 +870,6 @@ async function resolveStoreName(storeName, options = {}) {
       console.error("STORE RESOLUTION CACHE WRITE FAILED (db hit):", e);
     }
 
-    if (memKey) {
-      __resolverMemoryCache.set(memKey, { negative: false, value: ret });
-    }
-
     logStoreResolutionAudit(trace);
     return ret;
   }
@@ -802,12 +889,46 @@ async function resolveStoreName(storeName, options = {}) {
     return null;
   }
   if (pCache.type === "hit") {
-    const ret = cachePayloadFromFirestore(pCache.data, raw);
+    const data = pCache.data;
+    const cacheCanonical =
+      (data.canonicalName != null && String(data.canonicalName).trim()) ||
+      canonical ||
+      normalizeStoreName(raw) ||
+      raw;
+    const syncPayload = {
+      customer:
+        data.customer != null && String(data.customer).trim()
+          ? String(data.customer).trim()
+          : raw,
+      canonicalName: cacheCanonical,
+      address: data.address != null ? String(data.address) : "",
+      suburb: data.suburb != null ? String(data.suburb) : "",
+      city: data.city != null ? String(data.city) : "",
+      province: data.province != null ? String(data.province) : "",
+      lat: data.lat != null ? data.lat : null,
+      lng: data.lng != null ? data.lng : null,
+      source:
+        data.source != null && String(data.source).trim()
+          ? String(data.source).trim()
+          : "resolution_cache_sync",
+      updatedAt: Date.now()
+    };
+    if (data.placeId != null) syncPayload.placeId = data.placeId;
+    if (data.googleFormattedAddress != null) {
+      syncPayload.googleFormattedAddress = String(data.googleFormattedAddress);
+    }
+    try {
+      await db()
+        .collection(STORE_LOCATIONS)
+        .doc(cacheCanonical)
+        .set(syncPayload, { merge: true });
+    } catch (e) {
+      console.error("storeLocations backfill from storeResolution cache failed:", e);
+    }
+    const ret = cachePayloadFromFirestore(data, raw);
+    ret._storeLocationId = cacheCanonical;
     trace.finalSource = "persistent_hit";
     trace.finalAddress = ret.address;
-    if (memKey) {
-      __resolverMemoryCache.set(memKey, { negative: false, value: ret });
-    }
     logStoreResolutionAudit(trace);
     return ret;
   }
@@ -821,9 +942,16 @@ async function resolveStoreName(storeName, options = {}) {
   const attempts = buildResolverQueryAttempts(raw, cleaned);
   let placeResult = null;
   for (const q of attempts) {
-    const r = await fetchGooglePlaceResult(q, GOOGLE_API_KEY, trace);
+    console.log("[AUDIT] Resolver loop attempt query:", JSON.stringify(q));
+    const r = await fetchGooglePlaceResult(
+      q,
+      GOOGLE_API_KEY,
+      trace,
+      options.selectedRegions || ["south_africa"]
+    );
     if (!r) continue;
     if (r.resolutionStatus === "not_found") continue;
+    if (r.resolutionStatus === "wrong_region") continue;
     placeResult = r;
     break;
   }
@@ -871,6 +999,14 @@ async function resolveStoreName(storeName, options = {}) {
   }
 
   if (lat == null || lng == null) {
+    console.log(
+      "[AUDIT] Fallback triggered: missing lat/lng from Place Details; using Geocoding API"
+    );
+    console.log(
+      "[AUDIT] Fallback query (geocode address):",
+      JSON.stringify(placeResult.googleFormattedAddress || address)
+    );
+    console.log("[AUDIT] API used: google_geocoding");
     const geo = await geocodeLatLngFromAddress(
       placeResult.googleFormattedAddress || address,
       GOOGLE_API_KEY
@@ -902,7 +1038,8 @@ async function resolveStoreName(storeName, options = {}) {
   trace.finalSource = "google_places";
   trace.finalAddress = address;
 
-  const ref = existingRef || db().collection(STORE_LOCATIONS).doc();
+  const ref =
+    existingRef || db().collection(STORE_LOCATIONS).doc(safeCanonical);
   const payload = {
     customer: displayCustomer,
     canonicalName: safeCanonical,
@@ -946,10 +1083,6 @@ async function resolveStoreName(storeName, options = {}) {
     _storeLocationId: ref.id
   };
 
-  if (memKey) {
-    __resolverMemoryCache.set(memKey, { negative: false, value: ret });
-  }
-
   logStoreResolutionAudit(trace);
   return ret;
 }
@@ -963,12 +1096,20 @@ async function resolveStore(route, options = {}) {
   let raw =
     (route && (route.customer || route.name || route.address || "")) || "";
 
+  console.log(
+    "[AUDIT] Before resolveStore route strip:",
+    JSON.stringify(String(raw))
+  );
   raw = String(raw)
     .replace(/\(.*?\)/g, "") // remove (CL9)
     .replace(/\s*-\s*.*$/, "") // remove "- G770/167701"
     .trim();
 
   const rawName = raw;
+  console.log(
+    "[AUDIT] After resolveStore route strip:",
+    JSON.stringify(rawName)
+  );
 
   if (!rawName) {
     return {

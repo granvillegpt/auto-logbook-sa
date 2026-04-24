@@ -18,6 +18,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Manual admin access link records — backend only (mirrors logbook_tokens)
+    match /accessTokens/{docId} {
+      allow read, write: if false;
+    }
+
+    // PayFast logbook payment history — written by Cloud Functions; admin read in dashboard
+    match /payfast_payments/{docId} {
+      allow read: if request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.admin == "true" ||
+        request.auth.token.role == "admin"
+      );
+      allow write: if false;
+    }
+
     match /reviews_approved/{docId} {
       allow read: if true;
       allow write: if false;
@@ -33,6 +48,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /practitioner_codes/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /sponsoredTools/{docId} {
       allow read: if true;
       allow write: if false;
@@ -40,6 +60,12 @@ service cloud.firestore {
 
     match /system/{docId} {
       allow read: if true;
+      allow write: if false;
+    }
+
+    // Articles — public read only when published (CMS writes via Cloud Functions Admin SDK)
+    match /articles/{slug} {
+      allow read: if resource.data.published == true;
       allow write: if false;
     }
 

@@ -1817,6 +1817,15 @@ function generateLogbookEntries(visits, vehicleOpeningKm, homeAddress, startDate
         });
     }
 
+    let currentKM = Number(vehicleOpeningKm || 0);
+    for (let i = 0; i < generatedDays.length; i++) {
+        const entry = generatedDays[i];
+        const businessKm = Number(entry.businessKm) || 0;
+        entry.openingKm = currentKM;
+        entry.closingKm = currentKM + businessKm;
+        currentKM = entry.closingKm;
+    }
+
     return generatedDays;
 }
 
@@ -1914,8 +1923,9 @@ async function runLogbookEngine(input, adapterRoutesSnapshot) {
         // Date-mode synthetic row for downstream entry generation; weeks unused (no cycle expansion).
         routesForWorkDays = [{ mode: 'date', days: days, weeks: [] }];
     } else {
+        console.log("ENGINE VALIDATION MODE:", input.mode);
         validRoutes = routes.filter(function (r) {
-            return validateRoute(r, 'salesRep');
+            return validateRoute(r, input.mode || 'salesRep');
         });
         if (validRoutes.length === 0) {
             throw new Error('No valid routes after validation (all routes were skipped as invalid)');
@@ -2012,12 +2022,8 @@ async function runLogbookEngine(input, adapterRoutesSnapshot) {
 
     const forcedClosing = Number(closingKm);
 
-    for (let i = 0; i < entries.length; i++) {
-        entries[i].openingKm = Number(openingKm);
-
-        entries[i].closingKm = Number.isFinite(forcedClosing)
-            ? forcedClosing
-            : Number(openingKm);
+    if (entries.length > 0 && Number.isFinite(forcedClosing)) {
+        entries[entries.length - 1].closingKm = forcedClosing;
     }
 
     // ===============================
@@ -2147,4 +2153,6 @@ if (typeof module !== 'undefined' && module.exports) {
         ENGINE_VERSION: ENGINE_VERSION
     };
 }
+
+
 

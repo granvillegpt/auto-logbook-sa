@@ -17,21 +17,58 @@
   <meta name="twitter:title" content="Auto Logbook SA – Logbook Generator" />
   <meta name="twitter:description" content="Generate a SARS-compliant vehicle logbook in minutes." />
   <meta name="twitter:image" content="https://autologbook-sa.web.app/assets/logos/logo.png" />
-  <link rel="icon" type="image/png" href="assets/logos/auto_logbook_favicon-white.png">
+  <link rel="icon" href="/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/logbook-page.css" />
+  <style>
+    .city-dropdown { position: relative; max-width: 320px; }
+    .city-dropdown-trigger {
+      padding: 10px 14px;
+      border: 1px solid #d0d5dd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font: inherit;
+    }
+    .city-dropdown-trigger .city-dropdown-label-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .city-dropdown-menu {
+      position: absolute;
+      top: 110%;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      border: 1px solid #d0d5dd;
+      border-radius: 8px;
+      display: none;
+      z-index: 10;
+      padding: 10px;
+      box-sizing: border-box;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    }
+    .city-dropdown.open .city-dropdown-menu { display: block; }
+    .city-dropdown-menu label { display: block; padding: 6px; cursor: pointer; font: inherit; }
+    .city-dropdown-menu label:hover { background: #f8fafc; border-radius: 4px; }
+    .city-dropdown-menu input[type="checkbox"] { margin-right: 8px; vertical-align: middle; width: auto; }
+  </style>
 </head>
 <body>
   <header class="site-header site-header-landing">
     <div class="container header-inner">
       <a href="index.html" class="brand"><img src="assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
-      <nav class="site-nav">
+      <button type="button" id="hamburgerBtn" class="hamburger-btn" aria-label="Open menu">☰</button>
+      <nav class="site-nav nav-links" aria-label="Main">
         <a href="index.html">Home</a>
         <a href="index.html#how-it-works">How it Works</a>
         <a href="index.html#templates">Templates</a>
       </nav>
     </div>
   </header>
+
   <script>
     (function () {
       var base = 'https://autologbook-sa.web.app/logbook.html';
@@ -56,13 +93,6 @@
   <main>
   <div id="logbookContent" class="logbook-content-root" style="display:block;">
   <div class="page-container">
-  <div id="mobile-block-message" class="hidden">
-    <h2>Desktop or Tablet Required</h2>
-    <p>
-      Auto Logbook SA works best on a larger screen.
-      Please open this page on a desktop or tablet to generate your logbook.
-    </p>
-  </div>
   <div id="logbook-desktop-container">
   <div class="tool-container">
     <div class="step-progress" role="list" aria-label="Progress">
@@ -92,8 +122,36 @@
 
     <div class="routelist-verification-note">
       <p>
-        Check that the places, visit days, and addresses are correct before generating your logbook.
+        Please review your route list carefully before generating your logbook.<br><br>
+        We automatically match store names to addresses using mapping services, but results may not always be 100% accurate.<br><br>
+        ✔ Confirm that each store location is correct<br>
+        ✔ Check that the suburb/city matches your working area<br>
+        ✔ Review visit days and cycle weeks<br><br>
+        ⚠ Highlighted rows indicate locations that fall outside your selected city and require your attention.<br><br>
+        Make any necessary edits before proceeding.
       </p>
+    </div>
+
+    <div class="working-city-row">
+      <div class="working-city-field">
+        <label for="cityDropdownTrigger">Working City</label>
+        <div class="city-dropdown" id="cityDropdown">
+          <div class="city-dropdown-trigger" id="cityDropdownTrigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="cityDropdownMenu">
+            <span class="city-dropdown-label-text" id="cityDropdownLabelText">Cape Town</span>
+            <span class="arrow" aria-hidden="true">▼</span>
+          </div>
+
+          <div class="city-dropdown-menu" id="cityDropdownMenu" role="group" aria-label="Cities">
+            <label><input type="checkbox" value="cape_town" checked> Cape Town</label>
+            <label><input type="checkbox" value="johannesburg"> Johannesburg</label>
+            <label><input type="checkbox" value="pretoria"> Pretoria</label>
+            <label><input type="checkbox" value="durban"> Durban</label>
+            <label><input type="checkbox" value="port_elizabeth"> Port Elizabeth</label>
+            <label><input type="checkbox" value="east_london"> East London</label>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="btnRefreshRoutes" class="btn-refresh-routes">Refresh Routes</button>
     </div>
 
     <div class="routelist-actions">
@@ -114,7 +172,9 @@
           <button type="button" id="clear-routes-btn" class="btn btn-secondary hidden">Clear Routelist</button>
         </div>
       </div>
+      <div id="routesContainer">
       <div id="routelistPreviewContent" class="routelist-preview-content routes-scroll" aria-label="Routelist verification"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -292,7 +352,11 @@
             </label>
           </div>
           <div class="generate-btn-container">
+            <p class="downloads-left-line" id="downloadsLeftLine" aria-live="polite">Downloads left: <span id="downloadsLeft">—</span></p>
             <button type="submit" id="generateLogbookBtn" class="btn btn-primary generate-btn generate-logbook-button disabled" disabled>Generate My Logbook</button>
+            <div class="create-new-logbook-wrap">
+              <button type="button" id="btnNewLogbook" class="create-new-logbook-btn">Create Another Logbook</button>
+            </div>
             <div class="logbook-loading hidden" id="logbookLoadingBlock" aria-live="polite">
               <div class="loading-car-block">
                 <div class="loading-car">🚗</div>
@@ -447,28 +511,14 @@
   </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-content">
-      <p>© Auto Logbook SA</p>
-
-      <div class="footer-links">
-        <a href="#" id="openPrivacyFooter">Privacy</a>
-        <span class="footer-separator">•</span>
-        <a href="#" id="openTermsFooter">Terms</a>
-        <span class="footer-separator">•</span>
-        <a href="#" id="openRefundPolicyFooter">Refund Policy</a>
-        <span class="footer-separator">•</span>
-        <a href="#" id="openDisclaimerFooter">Disclaimer</a>
-        <span class="footer-separator">•</span>
-        <a href="mailto:support@autologbooksa.co.za">Contact</a>
-      </div>
-
-      <p class="engine">Powered by ClearTrack Logbook Engine</p>
-      <p class="footer-legal">Auto Logbook SA is an independent tool designed to assist with SARS logbook record-keeping. Users remain responsible for verifying all information.</p>
-      </div>
-    </div>
-  </footer>
+  <div id="site-footer"></div>
+  <script>
+fetch('/partials/footer.html')
+  .then(r => r.text())
+  .then(html => {
+    document.getElementById('site-footer').innerHTML = html;
+  });
+</script>
 
   <div id="legal-modals-root"></div>
 
@@ -502,23 +552,28 @@
   <script src="/firebase/init.js"></script>
   <script type="module" src="js/initLogbookService.js"></script>
   <script defer src="js/logbook-page.js"></script>
+
+<div id="newLogbookModal" class="modal hidden">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <h3>Start a new logbook?</h3>
+    <p>Your current inputs will be cleared.</p>
+    <div class="modal-actions">
+      <button type="button" id="modalCancel" class="btn btn-ghost">Cancel</button>
+      <button type="button" id="modalConfirm" class="btn btn-primary">Continue</button>
+    </div>
+  </div>
+</div>
+
   <script>
-  function checkScreenSize() {
-    var isMobile = window.innerWidth < 768;
-    var block = document.getElementById('mobile-block-message');
-    var desktop = document.getElementById('logbook-desktop-container');
-    if (block && desktop) {
-      if (isMobile) {
-        block.classList.remove('hidden');
-        desktop.classList.add('hidden');
-      } else {
-        block.classList.add('hidden');
-        desktop.classList.remove('hidden');
-      }
-    }
-  }
-  window.addEventListener('load', checkScreenSize);
-  window.addEventListener('resize', checkScreenSize);
-  </script>
+const hamburger = document.getElementById('hamburgerBtn');
+const nav = document.querySelector('.nav-links');
+
+if (hamburger && nav) {
+  hamburger.addEventListener('click', () => {
+    nav.classList.toggle('active');
+  });
+}
+</script>
 </body>
 </html>

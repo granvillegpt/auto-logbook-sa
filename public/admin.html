@@ -3,36 +3,182 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0b7285" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="manifest" href="/admin.webmanifest" />
   <title>Admin Dashboard – Auto Logbook SA</title>
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="icon" type="image/x-icon" href="/assets/logos/favicon.ico" sizes="32x32" />
+  <link rel="icon" href="/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
   <style>
-    .admin-header { padding: 16px 24px; background: var(--teal, #0b7285); color: #fff; margin-bottom: 24px; }
+    /* App shell: fixed viewport height; only main content scrolls */
+    .admin-app-root {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
+    .admin-app-root .admin-header {
+      flex-shrink: 0;
+    }
+    .admin-app-root .admin-install-banner {
+      flex-shrink: 0;
+    }
+    .admin-header {
+      padding: 6px 0 10px;
+      background: var(--teal, #0b7285);
+      color: #fff;
+      margin-bottom: 0;
+    }
+    /* Match .admin-layout-row: logo lines up with sidebar tabs */
+    .admin-header-shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .admin-header .admin-container.admin-header-inner {
+      max-width: none;
+      width: 100%;
+      margin: 0;
+      padding: 0 24px 0 12px;
+      box-sizing: border-box;
+    }
     .admin-header a { color: #fff; text-decoration: underline; }
     .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px; width: 100%; }
-    .admin-tabs-wrapper {
+    .admin-main-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f4f7f9;
+    }
+    .admin-layout-row {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      max-width: 1400px;
       width: 100%;
+      margin: 0 auto;
+      padding: 0;
+      gap: 0;
+      overflow: hidden;
+    }
+    .admin-sidebar {
+      flex: 0 0 232px;
+      width: 232px;
+      min-height: 0;
+      height: 100%;
+      padding: 16px 12px 24px 12px;
+      margin-right: 0;
+      border-right: 1px solid #e2e8f0;
+      background: #f8fafc;
+      overflow-x: hidden;
+      overflow-y: auto;
+      align-self: stretch;
     }
     .admin-tabs {
       display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 4px;
       width: 100%;
-      margin-bottom: 24px;
+      margin: 0;
     }
-    .admin-tabs button { padding: 10px 20px; border-radius: var(--radius, 8px); font-weight: 600; cursor: pointer; border: 2px solid var(--teal, #0b7285); background: #fff; color: var(--teal, #0b7285); }
-    .admin-tabs button.active { background: var(--teal, #0b7285); color: #fff; }
-    .admin-tabs button:hover:not(.active) { background: rgba(11, 114, 133, 0.08); }
+    .admin-tabs button {
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #334155;
+      line-height: 1.35;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .admin-tabs button:hover:not(.active) {
+      background: rgba(11, 114, 133, 0.08);
+      color: var(--teal, #0b7285);
+    }
+    .admin-tabs button.active {
+      background: #fff;
+      color: var(--teal, #0b7285);
+      border-color: rgba(11, 114, 133, 0.35);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    .admin-content-column {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 20px 24px 32px;
+      -webkit-overflow-scrolling: touch;
+    }
     .admin-content-wrapper {
       width: 100%;
+      max-width: none;
     }
     .admin-panel {
       background: #ffffff;
       border-radius: 12px;
       padding: 24px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-      margin-top: 20px;
+      margin-top: 16px;
+    }
+    .admin-content-column .admin-panel:first-of-type {
+      margin-top: 0;
+    }
+    @media (max-width: 900px) {
+      .admin-app-root {
+        height: 100vh;
+        overflow: hidden;
+      }
+      .admin-layout-row {
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .admin-sidebar {
+        flex: 0 0 auto;
+        width: 100%;
+        max-height: min(40vh, 280px);
+        height: auto;
+        margin-right: 0;
+        padding: 12px 16px 12px;
+        border-right: none;
+        border-bottom: 1px solid #e2e8f0;
+        overflow-y: auto;
+      }
+      .admin-content-column {
+        flex: 1;
+        min-height: 0;
+        padding: 16px 16px 24px;
+        overflow-y: auto;
+      }
+      .admin-tabs {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .admin-tabs button {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 140px;
+        width: auto;
+        text-align: center;
+        font-size: 13px;
+      }
+      .admin-header .admin-container.admin-header-inner {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .admin-header-brand {
+        padding-left: 0;
+      }
     }
     .admin-panel.hidden { display: none !important; }
     .admin-panel h2 { margin-bottom: 16px; }
@@ -44,8 +190,60 @@
     .admin-card .review-meta { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; }
     .admin-actions { display: flex; gap: 12px; margin-top: 12px; }
     .admin-actions button { padding: 8px 16px; border-radius: var(--radius); font-weight: 600; cursor: pointer; border: none; }
-    .btn-approve { background: #0b7285; color: #fff; }
     .btn-reject { background: #e2e8f0; color: var(--text); }
+    /* Logbook submission queue — compact approval cards */
+    #submissions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .admin-logbook-queue-card {
+      padding: 16px 18px;
+      margin: 0;
+    }
+    .admin-logbook-queue-title {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text, #1f2937);
+      line-height: 1.3;
+    }
+    .admin-logbook-queue-rows {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px 24px;
+      align-items: start;
+      width: 100%;
+    }
+    .admin-logbook-queue-field {
+      min-width: 0;
+    }
+    .admin-logbook-queue-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted, #64748b);
+      margin-bottom: 4px;
+    }
+    .admin-logbook-queue-value {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--text, #1f2937);
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .admin-logbook-queue-card .admin-actions {
+      margin-top: 14px;
+    }
+    @media (max-width: 520px) {
+      .admin-logbook-queue-rows {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
     .btn-delete { background: #fef2f2; color: #b91c1c; }
     .admin-empty { color: var(--text-muted); margin-top: 16px; }
     .admin-section { margin-bottom: 32px; }
@@ -187,15 +385,152 @@
     canvas {
       max-height: 250px;
     }
-    #adsPanel .admin-ads-section-title {
-      margin-top: 24px;
+    /* Sponsored Ads workspace */
+    #adsPanel .admin-ads-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
     }
-    #adsPanel .admin-ads-section-title:first-of-type {
-      margin-top: 0;
+    #adsPanel .admin-ads-tabs .tab {
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
     }
-    #adsPanel .admin-sponsored-table {
+    #adsPanel .admin-ads-panel-section[hidden] {
+      display: none !important;
+    }
+    #adsPanel .admin-sponsored-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      align-items: stretch;
+    }
+    #adsPanel .admin-sponsored-empty {
+      color: var(--text-muted, #64748b);
+      margin: 0;
+      padding: 8px 0;
+      grid-column: 1 / -1;
+    }
+    #adsPanel .admin-sponsored-ad-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid var(--border, #e2e8f0);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    #adsPanel .admin-sponsored-ad-card__img {
       width: 100%;
-      max-width: 100%;
+      height: 140px;
+      object-fit: cover;
+      background: #f1f5f9;
+      display: block;
+    }
+    #adsPanel .admin-sponsored-ad-card__body {
+      padding: 14px 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #adsPanel .admin-sponsored-ad-card__title {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text, #1f2937);
+      line-height: 1.3;
+    }
+    #adsPanel .admin-sponsored-ad-card__meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      font-size: 13px;
+      color: var(--text-muted, #64748b);
+    }
+    #adsPanel .admin-sponsored-ad-card__stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 0;
+      padding: 10px 0 0;
+      border-top: 1px solid #f1f5f9;
+    }
+    #adsPanel .admin-sponsored-ad-card__stats dt {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-muted, #64748b);
+    }
+    #adsPanel .admin-sponsored-ad-card__stats dd {
+      margin: 2px 0 0;
+      font-size: 15px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--text, #1f2937);
+    }
+    #adsPanel .admin-sponsored-ad-card__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px 16px;
+      border-top: 1px solid #f1f5f9;
+      margin-top: auto;
+    }
+    #adsPanel .admin-sponsored-ad-card__actions .btn {
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    #adsPanel .admin-sponsored-ad-card__actions a.btn {
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+    #adsPanel .admin-ad-desc-wrap {
+      margin-top: 4px;
+    }
+    #adsPanel .admin-ad-desc {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text-muted, #475569);
+    }
+    #adsPanel #adsMetricsRow {
+      margin-bottom: 24px;
+    }
+    .admin-articles-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .admin-articles-table th,
+    .admin-articles-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .admin-articles-table th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+    }
+    #articlesPanel .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
     }
     #couponsTab .card {
       background: #ffffff;
@@ -314,40 +649,163 @@
     #couponAnalytics .deleteCouponBtn:hover {
       background: #f1f5f9;
     }
+
+    /* Header — logo aligned with sidebar tab column; actions with content gutter */
+    .admin-header-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 12px;
+      min-height: 40px;
+    }
+    .admin-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+      padding-left: 4px;
+    }
+    .admin-header-logo {
+      display: block;
+      height: 36px;
+      width: auto;
+      max-width: min(240px, 55vw);
+      margin: 0;
+      padding: 0;
+      object-fit: contain;
+      flex-shrink: 0;
+      filter: brightness(0) invert(1);
+    }
+    .admin-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .admin-header-actions .btn-logout {
+      float: none;
+    }
+
+    /* Pricing panel — two-column cards */
+    .admin-pricing-intro {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--text-muted, #64748b);
+      line-height: 1.5;
+    }
+    .admin-pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: stretch;
+      margin-top: 8px;
+    }
+    @media (max-width: 960px) {
+      .admin-pricing-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .admin-pricing-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px 22px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    }
+    .admin-pricing-card h3 {
+      margin: 0 0 18px;
+      padding-bottom: 12px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .admin-pricing-card .form-group {
+      margin-bottom: 16px;
+    }
+    .admin-pricing-card .form-group:last-child {
+      margin-bottom: 0;
+    }
+    .admin-pricing-card .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    .admin-pricing-card .form-group input {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    .admin-pricing-footer {
+      margin-top: 24px;
+      padding-top: 4px;
+    }
+    .admin-pricing-footer #pricingStatus {
+      margin-top: 12px !important;
+    }
   </style>
 </head>
-<body>
+<body class="admin-app-root">
   <header class="admin-header">
-    <div class="admin-container" style="padding: 0;">
-      <button id="logoutBtn" class="btn-logout">
-        Logout
-      </button>
-      <span id="adminEmail" style="
-        float: right;
-        margin-right: 12px;
-        color: white;
-        font-size: 14px;
-        opacity: 0.9;
-      "></span>
-      <h1 style="margin: 8px 0 0; font-size: 1.25rem;">Admin Dashboard</h1>
-    </div>
-  </header>
-  <main class="admin-container">
-    <div class="admin-tabs-wrapper">
-      <div class="admin-tabs">
-        <button type="button" data-tab="dashboard" class="active">Dashboard</button>
-        <button type="button" data-tab="reviews">Reviews</button>
-        <button type="button" data-tab="logbook-submissions">Logbook submissions</button>
-        <button type="button" data-tab="ads">Sponsored Tools</button>
-        <button type="button" data-tab="performance">Ad Performance</button>
-        <button type="button" data-tab="pricing">Ad Pricing</button>
-        <button type="button" class="tab-btn" data-tab="coupons">Coupons</button>
-        <button type="button" data-tab="admin-logbook">Generate Logbook</button>
-        <button type="button" data-tab="upload">Upload Stores</button>
+    <div class="admin-header-shell">
+    <div class="admin-container admin-header-inner">
+      <div class="admin-header-brand">
+        <img
+          class="admin-header-logo"
+          src="/assets/logos/auto_logbook_logo-white.png"
+          alt="Auto Logbook SA"
+          width="200"
+          height="36"
+        />
+      </div>
+      <div class="admin-header-actions">
+        <button type="button" id="installAppBtn" class="btn-approve hidden">
+          Install App
+        </button>
+        <button id="logoutBtn" class="btn-logout" type="button">
+          Logout
+        </button>
       </div>
     </div>
+    </div>
+  </header>
+  <div class="admin-container admin-install-banner">
+    <div id="installTip" style="
+      font-size:13px;
+      color:#555;
+      margin:10px 0;
+      text-align:center;
+    " class="hidden">
+      💡 Install this app for faster access
+    </div>
+  </div>
+  <main class="admin-main-shell">
+    <div class="admin-layout-row">
+      <aside class="admin-sidebar" aria-label="Main navigation">
+        <nav class="admin-tabs" role="navigation">
+          <button type="button" data-tab="dashboard" class="active">Dashboard</button>
+          <button type="button" data-tab="payments">Payments</button>
+          <button type="button" data-tab="reviews">Reviews</button>
+          <button type="button" data-tab="logbook-submissions">Logbook submissions</button>
+          <button type="button" data-tab="ads">Sponsored Ads</button>
+          <button type="button" data-tab="pricing">Ad Pricing</button>
+          <button type="button" class="tab-btn" data-tab="coupons">Coupons</button>
+          <button type="button" data-tab="admin-logbook">Generate Logbook</button>
+          <button type="button" data-tab="upload">Upload Stores</button>
+          <button type="button" data-tab="articles">Articles</button>
+        </nav>
+      </aside>
 
-    <div class="admin-content-wrapper">
+      <div class="admin-content-column">
+        <div class="admin-content-wrapper">
       <div id="dashboardTab" class="admin-panel">
         <div class="admin-stats">
           <div class="stat-card">
@@ -403,6 +861,41 @@
 
         </div>
       </div>
+
+      <div id="paymentsPanel" class="admin-panel hidden">
+        <h2 class="admin-section-title">Payments</h2>
+        <p style="font-size:13px;color:#64748b;margin:0 0 14px;max-width:720px;">
+          Logbook PayFast payments (after successful email). Use search to filter by email; resend uses the same access link flow as the dashboard.
+        </p>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label for="paymentsEmailSearch">Filter by email</label>
+          <input type="text" id="paymentsEmailSearch" class="form-input" placeholder="user@example.com" autocomplete="off" style="max-width:420px;width:100%;box-sizing:border-box;" />
+        </div>
+        <div id="paymentsTableWrap" class="payments-table-container"></div>
+        <p id="paymentsStatus" style="font-size:13px;color:#64748b;margin-top:12px;"></p>
+        <section id="manualAccessLinkSection" class="admin-section" style="margin-top:28px;padding-top:24px;border-top:1px solid #e2e8f0;">
+          <h2 class="admin-section-title">Manual Access Link</h2>
+          <p style="font-size:13px;color:#64748b;margin:0 0 14px;max-width:640px;">Use this if a payment exists but the user didn't receive their email.</p>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="manualAccessEmail">Recipient email</label>
+            <input type="email" id="manualAccessEmail" class="form-input" placeholder="user@example.com" autocomplete="email" style="max-width:420px;width:100%;box-sizing:border-box;" />
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button type="button" id="btnGenerateAccessLink" class="btn btn-primary">Generate Access Link</button>
+            <button type="button" id="btnResendAccessLink" class="btn btn-secondary">Resend Access Link</button>
+          </div>
+          <p style="font-size:12px;color:#64748b;margin:8px 0 0;">Resend finds an active access token for this email or creates one, then emails the link (nothing shown here).</p>
+          <div class="form-group" style="margin-top:16px;">
+            <label for="manualAccessLinkOutput">Generated link</label>
+            <input type="text" id="manualAccessLinkOutput" readonly class="form-input" placeholder="—" style="max-width:640px;width:100%;box-sizing:border-box;" />
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button type="button" id="btnCopyManualAccessLink" class="btn btn-secondary" disabled>Copy link</button>
+            <span id="manualAccessLinkStatus" style="font-size:13px;color:#64748b;"></span>
+          </div>
+        </section>
+      </div>
+
       <div id="logbookSubmissionsPanel" class="admin-panel hidden">
         <h2 class="admin-section-title">Logbook submissions</h2>
         <div id="submissions"></div>
@@ -446,81 +939,105 @@
       </div>
 
       <div id="adsPanel" class="admin-panel hidden">
-        <div style="margin-bottom:16px;">
-          <select id="adsFilter" class="form-input" style="max-width:300px;">
-            <option value="all">All Ads</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved (Waiting for Payment)</option>
-            <option value="live">Live</option>
-            <option value="expired">Expired</option>
-            <option value="rejected">Rejected</option>
-          </select>
+        <h2 class="admin-section-title" style="margin-top:0;">Sponsored Ads</h2>
+
+        <div class="admin-stats" id="adsMetricsRow">
+          <div class="stat-card">
+            <h3 id="adsMetricLive">0</h3>
+            <p>Live Ads</p>
+            <span class="stat-trend">Active placements</span>
+          </div>
+          <div class="stat-card">
+            <h3 id="adsMetricPending">0</h3>
+            <p>Pending Ads</p>
+            <span class="stat-trend">Awaiting review</span>
+          </div>
+          <div class="stat-card">
+            <h3 id="adsMetricMonthlyRevenue">R0</h3>
+            <p>Monthly Revenue</p>
+            <span class="stat-trend">Paid this month</span>
+          </div>
+          <div class="stat-card">
+            <h3 id="adsMetricAvgCtr">0%</h3>
+            <p>Average CTR</p>
+            <span class="stat-trend">Live ads only</span>
+          </div>
         </div>
 
-        <section>
-          <h2 class="admin-section-title admin-ads-section-title">Pending Ads</h2>
-          <div id="pendingAds"></div>
+        <div class="admin-ads-tabs" role="tablist" aria-label="Ad status">
+          <button type="button" class="tab admin-ads-tab active" data-ads-tab="pending" role="tab" aria-selected="true">Pending</button>
+          <button type="button" class="tab admin-ads-tab" data-ads-tab="approved" role="tab" aria-selected="false">Awaiting Payment</button>
+          <button type="button" class="tab admin-ads-tab" data-ads-tab="live" role="tab" aria-selected="false">Live</button>
+          <button type="button" class="tab admin-ads-tab" data-ads-tab="expired" role="tab" aria-selected="false">Expired</button>
+          <button type="button" class="tab admin-ads-tab" data-ads-tab="rejected" role="tab" aria-selected="false">Rejected</button>
+        </div>
+
+        <section class="admin-ads-panel-section" data-ads-section="pending" id="adsSectionPending">
+          <div id="pendingAds" class="admin-sponsored-cards-grid"></div>
         </section>
 
-        <section>
-          <h2 class="admin-section-title admin-ads-section-title">Approved (Waiting for Payment)</h2>
-          <div id="waitingPaymentAds"></div>
+        <section class="admin-ads-panel-section" data-ads-section="approved" id="adsSectionApproved" hidden>
+          <div id="waitingPaymentAds" class="admin-sponsored-cards-grid"></div>
         </section>
 
-        <section>
-          <h2 class="admin-section-title admin-ads-section-title">Live Ads</h2>
-          <div id="liveAds"></div>
+        <section class="admin-ads-panel-section" data-ads-section="live" id="adsSectionLive" hidden>
+          <div id="liveAds" class="admin-sponsored-cards-grid"></div>
         </section>
 
-        <section>
-          <h2 class="admin-section-title admin-ads-section-title">Expired Ads</h2>
-          <div id="expiredAds"></div>
+        <section class="admin-ads-panel-section" data-ads-section="expired" id="adsSectionExpired" hidden>
+          <div id="expiredAds" class="admin-sponsored-cards-grid"></div>
         </section>
 
-        <section>
-          <h2 class="admin-section-title admin-ads-section-title">Rejected Ads</h2>
-          <div id="rejectedAds"></div>
+        <section class="admin-ads-panel-section" data-ads-section="rejected" id="adsSectionRejected" hidden>
+          <div id="rejectedAds" class="admin-sponsored-cards-grid"></div>
         </section>
-      </div>
-
-      <div id="performancePanel" class="admin-panel hidden">
-        <h2 class="admin-section-title">Ad Performance</h2>
-        <div id="performanceContent"></div>
       </div>
 
       <div id="pricingPanel" class="admin-panel hidden">
-        <h2 class="admin-section-title">Ad Pricing</h2>
-        <p class="admin-empty" style="margin-bottom: 16px;">Ad rates use <code>pricing/default</code> fields <code>ads.featured</code>, <code>ads.slot1</code>, <code>ads.slot2</code>, <code>ads.slot3</code>.</p>
-        <div class="form-group">
-          <label for="pricingFeatured">Featured placement (ZAR / month)</label>
-          <input type="number" id="pricingFeatured" min="0" step="1" placeholder="1500" style="max-width: 160px;">
+        <h2 class="admin-section-title">Pricing</h2>
+        <p class="admin-pricing-intro admin-empty">
+          Values map to <code>pricing/default</code>: <code>ads.featured</code>, <code>ads.slot1</code>–<code>slot3</code>, and logbook product fields.
+        </p>
+        <div class="admin-pricing-grid">
+          <div class="admin-pricing-card">
+            <h3>Advertising pricing</h3>
+            <div class="form-group">
+              <label for="pricingFeatured">Featured placement (ZAR / month)</label>
+              <input type="number" id="pricingFeatured" min="0" step="1" placeholder="1500">
+            </div>
+            <div class="form-group">
+              <label for="pricingSlot1">Slot 1 (ZAR / month)</label>
+              <input type="number" id="pricingSlot1" min="0" step="1" placeholder="1000">
+            </div>
+            <div class="form-group">
+              <label for="pricingSlot2">Slot 2 (ZAR / month)</label>
+              <input type="number" id="pricingSlot2" min="0" step="1" placeholder="800">
+            </div>
+            <div class="form-group">
+              <label for="pricingSlot3">Slot 3 (ZAR / month)</label>
+              <input type="number" id="pricingSlot3" min="0" step="1" placeholder="600">
+            </div>
+          </div>
+          <div class="admin-pricing-card">
+            <h3>Logbook pricing</h3>
+            <div class="form-group">
+              <label for="logbookPrice">Logbook price (ZAR)</label>
+              <input type="number" id="logbookPrice" min="0" step="1" placeholder="500">
+            </div>
+            <div class="form-group">
+              <label for="logbookTokens">Tokens included</label>
+              <input type="number" id="logbookTokens" min="0" step="1" placeholder="3">
+            </div>
+            <div class="form-group">
+              <label for="logbookLabel">Logbook label</label>
+              <input type="text" id="logbookLabel" placeholder="once-off pack">
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="pricingSlot1">Slot 1 (ZAR / month)</label>
-          <input type="number" id="pricingSlot1" min="0" step="1" placeholder="1000" style="max-width: 160px;">
+        <div class="admin-pricing-footer">
+          <button type="button" id="pricingSaveBtn" class="btn btn-primary">Save Pricing</button>
+          <p id="pricingStatus" style="font-size: 13px; margin-top: 12px; color: var(--text-muted);"></p>
         </div>
-        <div class="form-group">
-          <label for="pricingSlot2">Slot 2 (ZAR / month)</label>
-          <input type="number" id="pricingSlot2" min="0" step="1" placeholder="800" style="max-width: 160px;">
-        </div>
-        <div class="form-group">
-          <label for="pricingSlot3">Slot 3 (ZAR / month)</label>
-          <input type="number" id="pricingSlot3" min="0" step="1" placeholder="600" style="max-width: 160px;">
-        </div>
-        <div class="form-group">
-          <label for="logbookPrice">Logbook price (ZAR)</label>
-          <input type="number" id="logbookPrice" min="0" step="1" placeholder="500" style="max-width: 160px;">
-        </div>
-        <div class="form-group">
-          <label for="logbookTokens">Logbook tokens included</label>
-          <input type="number" id="logbookTokens" min="0" step="1" placeholder="3" style="max-width: 160px;">
-        </div>
-        <div class="form-group">
-          <label for="logbookLabel">Logbook label</label>
-          <input type="text" id="logbookLabel" placeholder="once-off pack" style="max-width: 240px;">
-        </div>
-        <button type="button" id="pricingSaveBtn" class="btn btn-primary">Save pricing</button>
-        <p id="pricingStatus" style="font-size: 13px; margin-top: 12px; color: var(--text-muted);"></p>
       </div>
 
       <div id="adminLogbookPanel" class="admin-panel admin-logbook-panel hidden">
@@ -635,6 +1152,7 @@
       </div>
 
       <div class="tab-content admin-panel hidden" id="couponsTab">
+        <h2 class="admin-subtitle">Standard Coupons</h2>
         <div class="card">
           <h3>Create Coupon</h3>
 
@@ -660,6 +1178,85 @@
           <h3>Coupon Performance</h3>
           <div id="couponAnalytics"></div>
         </div>
+
+        <div class="admin-divider"></div>
+
+        <div id="practitionerCodesSection" class="admin-section">
+          <h2 class="admin-subtitle">Practitioner Codes</h2>
+          <div id="practitionerCodesList"></div>
+        </div>
+
+        <div id="practitionerApplicationsSection" class="admin-section">
+          <h2>Practitioner Discount Applications</h2>
+          <div id="practitionerApplicationsList"></div>
+        </div>
+      </div>
+
+      <div id="articlesPanel" class="admin-panel hidden">
+        <h2 class="admin-section-title" style="margin-top:0;">Articles</h2>
+        <p class="admin-empty" style="margin-bottom:16px;">
+          Create and publish articles for the public <strong>Resources</strong> page and <code>/articles/{slug}</code>.
+        </p>
+        <div id="articlesAdminList" style="margin-bottom:24px;"></div>
+        <p style="margin:0 0 16px;font-size:13px;color:#64748b;">
+          If an article ever had full-page HTML pasted into the body, use
+          <strong>Strip layout from all articles</strong> once after deploying updated functions (removes site chrome from every saved <code>body</code> in Firestore).
+        </p>
+        <button type="button" id="articleBtnResanitizeBodies" class="btn btn-secondary" style="margin-bottom:20px;">
+          Strip layout from all articles
+        </button>
+        <div class="admin-articles-form card" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;max-width:720px;">
+          <h3 class="admin-subtitle" style="margin-top:0;">Create or edit</h3>
+          <input type="hidden" id="articleOriginalSlug" value="" />
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldTitle">Title</label>
+            <input type="text" id="articleFieldTitle" class="form-input" placeholder="Article title" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldSlug">Slug (URL)</label>
+            <input type="text" id="articleFieldSlug" class="form-input" placeholder="e.g. my-article-title" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFeaturedFile">Featured image</label>
+            <p style="font-size:12px;color:#64748b;margin:0 0 8px;">Set the slug first, then upload (stored at <code>articles/{slug}/…</code>).</p>
+            <input type="file" id="articleFeaturedFile" accept="image/*" class="form-input" style="width:100%;box-sizing:border-box;padding:8px;" />
+            <input type="hidden" id="articleFieldFeaturedUrl" value="" />
+            <div id="articleFeaturedPreviewWrap" hidden style="margin-top:12px;">
+              <img id="articleFeaturedPreviewImg" alt="Featured preview" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #e2e8f0;object-fit:contain;background:#f8fafc;" />
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldExcerpt">Excerpt</label>
+            <textarea id="articleFieldExcerpt" class="form-input" rows="3" placeholder="Short summary" style="width:100%;box-sizing:border-box;"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldBody">Body (HTML)</label>
+            <textarea id="articleFieldBody" class="form-input" rows="12" placeholder="&lt;p&gt;…&lt;/p&gt;" style="width:100%;box-sizing:border-box;font-family:ui-monospace,monospace;font-size:13px;"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldMetaTitle">Meta title (SEO)</label>
+            <input type="text" id="articleFieldMetaTitle" class="form-input" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldMetaDesc">Meta description (SEO)</label>
+            <textarea id="articleFieldMetaDesc" class="form-input" rows="2" style="width:100%;box-sizing:border-box;"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="articleFieldAuthorName">Author name</label>
+            <input type="text" id="articleFieldAuthorName" class="form-input" placeholder="Display name" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+            <input type="checkbox" id="articleFieldPublished" />
+            Published
+          </label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="button" id="articleBtnSave" class="btn btn-primary">Save article</button>
+            <button type="button" id="articleBtnNew" class="btn btn-secondary">New article</button>
+          </div>
+          <p id="articlesAdminStatus" style="margin-top:12px;font-size:13px;color:#64748b;"></p>
+        </div>
+      </div>
+        </div>
       </div>
     </div>
   </main>
@@ -668,6 +1265,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
   <script src="/firebase/init.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -681,10 +1279,53 @@
   <script src="/js/firebase-init.js"></script>
   <script src="/js/payment-service.js"></script>
   <script type="module" src="/js/admin.js"></script>
+  <script src="/js/articles-admin.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="/js/admin-upload.js"></script>
   <script src="/js/ad-booking-shared.js"></script>
   <script src="/js/admin-ads.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/admin-shell-sw.js").catch(function (err) {
+          console.warn("[admin] Service worker registration failed:", err);
+        });
+      });
+    }
+  </script>
+  <script>
+    (function () {
+      var deferredPrompt = null;
+      var installBtn = document.getElementById('installAppBtn');
+      var installTip = document.getElementById('installTip');
+      if (!installBtn || !installTip) return;
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.classList.remove('hidden');
+        installTip.classList.remove('hidden');
+      });
+
+      installBtn.addEventListener('click', async function () {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        var choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          console.log('APP INSTALLED');
+        }
+        deferredPrompt = null;
+        installBtn.classList.add('hidden');
+        installTip.classList.add('hidden');
+      });
+
+      window.addEventListener('appinstalled', function () {
+        console.log('PWA INSTALLED');
+        installBtn.classList.add('hidden');
+        installTip.classList.add('hidden');
+      });
+    })();
+  </script>
 </body>
 </html>

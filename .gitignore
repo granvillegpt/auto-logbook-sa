@@ -1,7 +1,16 @@
 node_modules/
 .env
+**/.env
+.env.*
+!.env.example
+!functions/.env.example
+!logbook-engine-core/lab/.env.example
+!auto\ logbook\ SA/logbook-engine-core/lab/.env.example
 .firebase/
 .firebaserc
 data/osm/
 *.pbf
 *.log
+firebase-debug.log
+serviceAccountKey.json
+**/serviceAccountKey.json

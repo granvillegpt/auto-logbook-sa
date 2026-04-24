@@ -71,30 +71,6 @@
   var PROVINCE_ALIASES = ['province', 'region', 'state'];
 
   /**
-   * Detect header row by counting how many known column names appear (broad match).
-   * Does not require any specific columns; picks best-matching row.
-   */
-  function detectHeaderRow(jsonData, maxRowsToScan) {
-    var headerRowIndex = 0;
-    var bestMatchCount = 0;
-    var keywords = ['customer', 'client', 'address', 'street', 'location', 'place', 'suburb', 'city', 'province', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'week'];
-    for (var rowIdx = 0; rowIdx < maxRowsToScan; rowIdx++) {
-      var row = jsonData[rowIdx];
-      if (!row || row.length === 0) continue;
-      var rowLower = row.map(function (cell) { return cell ? String(cell).toLowerCase().trim() : ''; });
-      var matchCount = 0;
-      for (var k = 0; k < keywords.length; k++) {
-        if (rowLower.some(function (cell) { return cell && cell.indexOf(keywords[k]) !== -1; })) matchCount++;
-      }
-      if (matchCount > bestMatchCount) {
-        bestMatchCount = matchCount;
-        headerRowIndex = rowIdx;
-      }
-    }
-    return headerRowIndex;
-  }
-
-  /**
    * Stage 1: Raw routelist ingest.
    * Reads the uploaded Excel, detects header row, extracts rows. Does NOT require Address/Suburb/City/Province.
    * @param {ArrayBuffer} arrayBuffer - Excel file buffer
@@ -112,14 +88,20 @@
     if (!firstSheetName) throw new Error('Excel file has no sheets');
 
     var worksheet = workbook.Sheets[firstSheetName];
-    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+    var jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null });
     if (jsonData.length === 0) throw new Error('Excel sheet is empty');
 
-    var maxRowsToScan = Math.min(10, jsonData.length);
-    var headerRowIndex = detectHeaderRow(jsonData, maxRowsToScan);
-    var headerRow = jsonData[headerRowIndex];
-    if (!headerRow || headerRow.length === 0) {
-      headerRow = [];
+    var headerRowIndex = 0;
+    var headerRow = [];
+    for (var scanIdx = 0; scanIdx < jsonData.length; scanIdx++) {
+      var probe = jsonData[scanIdx];
+      if (probe && typeof probe === 'object' && !Array.isArray(probe)) {
+        var keys = Object.keys(probe);
+        if (keys.length > 0) {
+          headerRow = keys;
+          break;
+        }
+      }
     }
 
     var columnMap = {
@@ -152,8 +134,8 @@
     };
 
     var rows = [];
-    for (var ri = headerRowIndex + 1; ri < jsonData.length; ri++) {
-      rows.push(jsonData[ri] || []);
+    for (var ri = 0; ri < jsonData.length; ri++) {
+      rows.push(jsonData[ri]);
     }
 
     return { headerRowIndex: headerRowIndex, headerRow: headerRow, columnMap: columnMap, detectedColumnNames: detectedColumnNames, rows: rows };
@@ -238,25 +220,39 @@
   function enrichRouteRows(rawResult) {
     var columnMap = rawResult.columnMap;
     var rows = rawResult.rows;
+    var headerRowArr = rawResult.headerRow || [];
     var enriched = [];
+
+    function rowVal(r, colIndex) {
+      if (r == null || colIndex == null) return undefined;
+      if (Array.isArray(r)) return r[colIndex];
+      var key = headerRowArr[colIndex];
+      return key != null ? r[key] : undefined;
+    }
 
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      if (!r || r.length === 0) {
+      if (!r) {
+        continue;
+      }
+      if (Array.isArray(r) && r.length === 0) {
+        continue;
+      }
+      if (typeof r === 'object' && !Array.isArray(r) && Object.keys(r).length === 0) {
         continue;
       }
 
-      var address = (columnMap.addressCol != null && r[columnMap.addressCol] != null && r[columnMap.addressCol] !== '')
-        ? (r[columnMap.addressCol] || '').toString().trim()
+      var address = (columnMap.addressCol != null && rowVal(r, columnMap.addressCol) != null && rowVal(r, columnMap.addressCol) !== '')
+        ? (rowVal(r, columnMap.addressCol) || '').toString().trim()
         : null;
-      var suburb = (columnMap.suburbCol != null && r[columnMap.suburbCol] != null && r[columnMap.suburbCol] !== '')
-        ? (r[columnMap.suburbCol] || '').toString().trim()
+      var suburb = (columnMap.suburbCol != null && rowVal(r, columnMap.suburbCol) != null && rowVal(r, columnMap.suburbCol) !== '')
+        ? (rowVal(r, columnMap.suburbCol) || '').toString().trim()
         : null;
-      var city = (columnMap.cityCol != null && r[columnMap.cityCol] != null && r[columnMap.cityCol] !== '')
-        ? (r[columnMap.cityCol] || '').toString().trim()
+      var city = (columnMap.cityCol != null && rowVal(r, columnMap.cityCol) != null && rowVal(r, columnMap.cityCol) !== '')
+        ? (rowVal(r, columnMap.cityCol) || '').toString().trim()
         : null;
-      var province = (columnMap.provinceCol != null && r[columnMap.provinceCol] != null && r[columnMap.provinceCol] !== '')
-        ? (r[columnMap.provinceCol] || '').toString().trim()
+      var province = (columnMap.provinceCol != null && rowVal(r, columnMap.provinceCol) != null && rowVal(r, columnMap.provinceCol) !== '')
+        ? (rowVal(r, columnMap.provinceCol) || '').toString().trim()
         : null;
 
       if (city == null && suburb != null) {
@@ -264,41 +260,55 @@
       }
 
       // Business/store name: taken from customer column (or address fallback). No cleaning—only trim; legal suffixes and messy names pass through to address lookup.
-      var customer = (columnMap.customerCol != null && r[columnMap.customerCol] != null && (r[columnMap.customerCol] + '').trim() !== '')
-        ? String(r[columnMap.customerCol]).trim()
+      var customer = (columnMap.customerCol != null && rowVal(r, columnMap.customerCol) != null && (rowVal(r, columnMap.customerCol) + '').trim() !== '')
+        ? String(rowVal(r, columnMap.customerCol)).trim()
         : (address != null ? address : null);
-      if (customer && typeof console !== 'undefined' && console.log) {
-        console.log('RAW NAME:', customer);
-      }
 
-      // Cycle weeks: default [1,2,3,4] when Week/Weeks missing or empty; column overrides when valid.
-      var weeks = [1, 2, 3, 4];
-      if (columnMap.weeksCol != null && r[columnMap.weeksCol] != null && r[columnMap.weeksCol] !== '') {
-        var weeksValue = String(r[columnMap.weeksCol]).trim();
-        if (weeksValue) {
-          var parsed = weeksValue.split(',').map(function (w) { return parseInt(w.trim(), 10); }).filter(function (w) { return !isNaN(w) && w >= 1 && w <= 4; });
-          if (parsed.length > 0) weeks = parsed;
+      var rawWeek = r['Week'];
+
+      var weeks = [];
+
+      if (rawWeek != null) {
+        var cleaned = String(rawWeek)
+          .replace(/[^0-9,]/g, '')   // remove everything except numbers and commas
+          .trim();
+
+        if (cleaned) {
+          var parsed = cleaned
+            .split(',')
+            .map(function (w) { return parseInt(w.trim(), 10); })
+            .filter(function (w) { return w >= 1 && w <= 4; });
+
+          if (parsed.length > 0) {
+            weeks = parsed;
+          } else {
+            weeks = [];
+          }
+        } else {
+          weeks = [];
         }
+      } else {
+        weeks = [];
       }
 
       var frequency = null;
-      if (columnMap.frequencyCol != null && r[columnMap.frequencyCol] != null && r[columnMap.frequencyCol] !== '') {
-        frequency = String(r[columnMap.frequencyCol]).trim();
+      if (columnMap.frequencyCol != null && rowVal(r, columnMap.frequencyCol) != null && rowVal(r, columnMap.frequencyCol) !== '') {
+        frequency = String(rowVal(r, columnMap.frequencyCol)).trim();
       }
-      var startDate = (columnMap.startDateCol != null && r[columnMap.startDateCol] != null && r[columnMap.startDateCol] !== '')
-        ? parseExcelDateToISOString(r[columnMap.startDateCol])
+      var startDate = (columnMap.startDateCol != null && rowVal(r, columnMap.startDateCol) != null && rowVal(r, columnMap.startDateCol) !== '')
+        ? parseExcelDateToISOString(rowVal(r, columnMap.startDateCol))
         : null;
-      var endDate = (columnMap.endDateCol != null && r[columnMap.endDateCol] != null && r[columnMap.endDateCol] !== '')
-        ? parseExcelDateToISOString(r[columnMap.endDateCol])
+      var endDate = (columnMap.endDateCol != null && rowVal(r, columnMap.endDateCol) != null && rowVal(r, columnMap.endDateCol) !== '')
+        ? parseExcelDateToISOString(rowVal(r, columnMap.endDateCol))
         : null;
 
       var days = {
-        mon: columnMap.monCol != null ? cellToBoolean(r[columnMap.monCol]) : false,
-        tue: columnMap.tueCol != null ? cellToBoolean(r[columnMap.tueCol]) : false,
-        wed: columnMap.wedCol != null ? cellToBoolean(r[columnMap.wedCol]) : false,
-        thu: columnMap.thuCol != null ? cellToBoolean(r[columnMap.thuCol]) : false,
-        fri: columnMap.friCol != null ? cellToBoolean(r[columnMap.friCol]) : false,
-        sat: columnMap.satCol != null ? cellToBoolean(r[columnMap.satCol]) : false
+        mon: columnMap.monCol != null ? cellToBoolean(rowVal(r, columnMap.monCol)) : false,
+        tue: columnMap.tueCol != null ? cellToBoolean(rowVal(r, columnMap.tueCol)) : false,
+        wed: columnMap.wedCol != null ? cellToBoolean(rowVal(r, columnMap.wedCol)) : false,
+        thu: columnMap.thuCol != null ? cellToBoolean(rowVal(r, columnMap.thuCol)) : false,
+        fri: columnMap.friCol != null ? cellToBoolean(rowVal(r, columnMap.friCol)) : false,
+        sat: columnMap.satCol != null ? cellToBoolean(rowVal(r, columnMap.satCol)) : false
       };
 
       var fullAddress = buildFullAddressFromParts(address, suburb, city, province);
@@ -313,11 +323,12 @@
         /^\d+$/.test(customerName) ||
         customerName === '<TEMP>' ||
         customerName === '0' ||
-        customerName === '-' ||
-        !hasActiveDay
+        customerName === '-'
       ) {
         continue;
       }
+
+      console.log('[AUDIT] Original storeName input (parser):', JSON.stringify(customer));
 
       var route = {
         mode: 'cycle',
@@ -334,9 +345,6 @@
       if (frequency != null) route.frequency = frequency;
       if (startDate != null) route.startDate = startDate;
       if (endDate != null) route.endDate = endDate;
-      if (typeof console !== 'undefined' && console.log) {
-        console.log('[WEEKDAY_ROUTE_FREQUENCY]', route.customer || route.location, route.frequency, route.startDate, route.endDate, route.weeks);
-      }
       enriched.push(route);
     }
 

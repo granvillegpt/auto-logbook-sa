@@ -1,5 +1,10 @@
 const ADMIN_KEY = "your-secret-key";
-const LOGBOOK_FUNCTIONS_BASE = "http://127.0.0.1:5007/autologbook-sa/us-central1";
+const LOGBOOK_FUNCTIONS_BASE =
+  typeof window !== "undefined" &&
+  window.location &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://127.0.0.1:5007/autologbook-sa/us-central1"
+    : "https://us-central1-autologbook-sa.cloudfunctions.net";
 console.log("🔥 UPLOAD ENDPOINT:", LOGBOOK_FUNCTIONS_BASE + "/api/admin/upload-stores");
 
 function adminHeadersJson() {

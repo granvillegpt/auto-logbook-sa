@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const cheerio = require("cheerio");
 const { FieldValue } = require("firebase-admin/firestore");
 const { isSlotAvailable } = require("./sponsoredSlotValidation");
 const { endDateISOFromBookedMonths } = require("./adBookingHelpers");
@@ -34,7 +35,8 @@ async function verifyAdmin(req, res) {
       throw new Error("Not admin");
     }
     return decoded;
-  } catch (_err) {
+  } catch (err) {
+    console.error("VERIFY ERROR:", err);
     res.status(403).json({ success: false, error: "Unauthorized" });
     return null;
   }
@@ -96,6 +98,19 @@ async function getAdminDashboardData(req, res) {
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message || "Failed to load dashboard data" });
+  }
+}
+
+/** Full list for admin logbook submissions tab (Admin SDK; avoids client rules on logbookSubmissions). */
+async function getLogbookSubmissionsForAdmin(_req, res) {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("logbookSubmissions").get();
+    const submissions = [];
+    snap.forEach((d) => submissions.push({ id: d.id, ...d.data() }));
+    return res.json({ success: true, submissions });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message || "Failed to load logbook submissions" });
   }
 }
 
@@ -213,21 +228,38 @@ async function approveAd(req, res) {
     const adId = req.body && req.body.adId;
     if (!adId) return res.status(400).json({ success: false, error: "Missing adId" });
     const db = admin.firestore();
-    const ref = db.collection("sponsoredTools").doc(String(adId));
-    const snap = await ref.get();
-    if (!snap.exists) {
-      return res.status(400).json({ success: false, error: "Ad not found" });
+    const doc = await db.collection("sponsoredTools").doc(String(adId)).get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ success: false, error: "Ad not found" });
     }
-    const after = snap.data() || {};
-    const status = String(after.status || "").toLowerCase().trim();
+
+    const ad = doc.data() || {};
+
+    const email =
+      ad.contactEmail ||
+      ad.email ||
+      ad.userEmail ||
+      "";
+
+    const amount = Number(ad.amount || 0);
+
+    const title =
+      ad.title ||
+      ad.toolName ||
+      "Your Ad";
+
+    const slot = ad.slot || "your selected slot";
+
+    const status = String(ad.status || "").toLowerCase().trim();
     if (status !== "pending") {
       return res.status(400).json({ success: false, error: "Ad is not pending approval" });
     }
-    const months = Array.isArray(after.months) ? after.months : [];
-    if (!after.slot || !months.length) {
+    const months = Array.isArray(ad.months) ? ad.months : [];
+    if (!ad.slot || !months.length) {
       return res.status(400).json({ success: false, error: "Invalid ad configuration" });
     }
-    const ok = await isSlotAvailable(after.slot, months, String(adId));
+    const ok = await isSlotAvailable(ad.slot, months, String(adId));
     if (!ok) {
       return res.status(400).json({
         success: false,
@@ -240,12 +272,12 @@ async function approveAd(req, res) {
       return res.status(400).json({ success: false, error: "Invalid ad id" });
     }
 
-    const userEmail = String(after.contactEmail || "").trim();
+    const userEmail = String(email).trim();
     if (!userEmail || !userEmail.includes("@")) {
       return res.status(400).json({ success: false, error: "Ad missing contact email" });
     }
 
-    const adPrice = Number(after.amount);
+    const adPrice = amount;
     if (!Number.isFinite(adPrice) || adPrice <= 0) {
       return res.status(400).json({ success: false, error: "Invalid ad amount" });
     }
@@ -263,19 +295,25 @@ async function approveAd(req, res) {
       `&item_name=${encodeURIComponent("Ad Placement")}` +
       `&months=${encodeURIComponent(String(monthsSafe))}`;
 
-    await sendGridEmail({
-      to: userEmail,
-      templateId: AD_PAYMENT_TEMPLATE_ID,
-      dynamicTemplateData: {
-        payment_link: payment_link,
-        amount: adPrice.toFixed(2),
-        year: new Date().getFullYear(),
-      },
-    });
+    if (email && amount > 0) {
+      try {
+        await sendGridEmail({
+          to: userEmail,
+          templateId: AD_PAYMENT_TEMPLATE_ID,
+          dynamicTemplateData: {
+            payment_link: payment_link,
+            amount: adPrice.toFixed(2),
+            year: new Date().getFullYear(),
+          },
+        });
+      } catch (err) {
+        console.error("EMAIL ERROR:", err);
+      }
+    }
 
     const year = new Date().getFullYear();
     const endDate = endDateISOFromBookedMonths(months, year);
-    await ref.update({
+    await db.collection("sponsoredTools").doc(String(adId)).update({
       status: "approved",
       endDate: endDate || null,
       emailSent: true,
@@ -295,6 +333,18 @@ async function rejectAd(req, res) {
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message || "Reject failed" });
+  }
+}
+
+async function deleteAd(req, res) {
+  try {
+    const adId = req.body && req.body.adId;
+    if (!adId) return res.status(400).json({ success: false, error: "Missing adId" });
+    const db = admin.firestore();
+    await db.collection("sponsoredTools").doc(String(adId)).delete();
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message || "Delete failed" });
   }
 }
 
@@ -446,19 +496,255 @@ async function unassignPlacement(req, res) {
   }
 }
 
+const ARTICLE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Page-level / site chrome selectors — must not appear inside article body HTML. */
+const ARTICLE_BODY_BANNED_LAYOUT_TAGS = ["header", "footer", "nav", "main", "body", "html", "head"];
+const ARTICLE_BODY_BANNED_LAYOUT_CLASSES = [
+  "site-header",
+  "site-header-landing",
+  "site-nav",
+  "site-footer",
+  "footer-content",
+  "nav-links",
+];
+
+function stripScriptStyleIframeAndInlineHandlers(html) {
+  let s = html
+    .replace(/<\/(?:script|style|iframe)[^>]*>/gi, "")
+    .replace(/<(?:script|style|iframe)[^>]*>[\s\S]*?<\/(?:script|style|iframe)>/gi, "")
+    .replace(/<(?:script|style|iframe)[^>]*\/?>/gi, "");
+  s = s.replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  s = s.replace(/javascript:/gi, "");
+  return s;
+}
+
+/**
+ * Article body: allow typical rich text (p, headings, lists, emphasis, links, images,
+ * blockquotes, div/section, tables, etc.) but strip site-level layout tags and known
+ * Auto Logbook SA layout classnames from pasted full pages.
+ */
+function sanitizeArticleBody(html) {
+  if (typeof html !== "string") return "";
+  let s = stripScriptStyleIframeAndInlineHandlers(html);
+  if (!s.trim()) return "";
+
+  const wrapId = "__sanitize_article_body_root__";
+  const wrapped = `<div id="${wrapId}">${s}</div>`;
+  let $;
+  try {
+    $ = cheerio.load(wrapped, { decodeEntities: false });
+  } catch (e) {
+    console.warn("sanitizeArticleBody cheerio.load failed, returning stripped string only", e);
+    return s.slice(0, 500000);
+  }
+
+  const root = $(`#${wrapId}`);
+  if (!root.length) {
+    return stripScriptStyleIframeAndInlineHandlers(s).slice(0, 500000);
+  }
+
+  for (const tag of ARTICLE_BODY_BANNED_LAYOUT_TAGS) {
+    root.find(tag).remove();
+  }
+  for (const cls of ARTICLE_BODY_BANNED_LAYOUT_CLASSES) {
+    root.find(`.${cls}`).remove();
+  }
+
+  let out = root.html() || "";
+  out = stripScriptStyleIframeAndInlineHandlers(out);
+  return out.slice(0, 500000);
+}
+
+async function resanitizeAllArticleBodies(req, res) {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("articles").get();
+    const updatedSlugs = [];
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const raw = String(data.body || "");
+      const cleaned = sanitizeArticleBody(raw);
+      if (cleaned !== raw) {
+        await doc.ref.update({
+          body: cleaned,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        updatedSlugs.push(doc.id);
+      }
+    }
+    return res.json({
+      success: true,
+      updatedSlugs,
+      updatedCount: updatedSlugs.length,
+    });
+  } catch (err) {
+    console.error("resanitizeAllArticleBodies", err);
+    return res.status(500).json({ success: false, error: err.message || "Resanitize failed" });
+  }
+}
+
+function articleDocToJSON(doc) {
+  const data = doc.data() || {};
+  const out = { id: doc.id, slug: doc.id, ...data };
+  for (const key of ["createdAt", "updatedAt", "publishedAt"]) {
+    const v = out[key];
+    if (v && typeof v.toDate === "function") {
+      out[key] = v.toDate().toISOString();
+    }
+  }
+  return out;
+}
+
+async function getArticlesAdmin(req, res) {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("articles").get();
+    const articles = snap.docs
+      .map((d) => articleDocToJSON(d))
+      .sort((a, b) => {
+        const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return tb - ta;
+      });
+    return res.json({ success: true, articles });
+  } catch (err) {
+    console.error("getArticlesAdmin", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to list articles" });
+  }
+}
+
+async function upsertArticle(req, res, user) {
+  try {
+    const body = req.body || {};
+    const title = String(body.title || "").trim();
+    const slug = String(body.slug || "")
+      .trim()
+      .toLowerCase();
+    const originalSlug =
+      body.originalSlug != null ? String(body.originalSlug).trim().toLowerCase() : "";
+
+    if (!title || title.length > 300) {
+      return res.status(400).json({ success: false, error: "Title is required (max 300 chars)" });
+    }
+    if (!slug || !ARTICLE_SLUG_RE.test(slug) || slug.length > 200) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid slug (lowercase letters, numbers, hyphens only)" });
+    }
+
+    const featuredImageUrl = String(body.featuredImageUrl || "").trim().slice(0, 2000);
+    const excerpt = String(body.excerpt || "").trim().slice(0, 2000);
+    const bodyHtml = sanitizeArticleBody(String(body.body || ""));
+    const metaTitle = String(body.metaTitle || "").trim().slice(0, 200);
+    const metaDescription = String(body.metaDescription || "").trim().slice(0, 500);
+    const published = Boolean(body.published);
+    const authorName = String(body.authorName || user.email || "Admin").trim().slice(0, 200);
+
+    const db = admin.firestore();
+    const now = FieldValue.serverTimestamp();
+    const ref = db.collection("articles").doc(slug);
+
+    if (originalSlug && originalSlug !== slug) {
+      const oldRef = db.collection("articles").doc(originalSlug);
+      const oldSnap = await oldRef.get();
+      if (!oldSnap.exists) {
+        return res.status(404).json({ success: false, error: "Original article not found" });
+      }
+      const oldData = oldSnap.data() || {};
+      const createdAt = oldData.createdAt || now;
+      let publishedAt = oldData.publishedAt || null;
+      if (published && !oldData.published) {
+        publishedAt = now;
+      }
+      if (!published) {
+        publishedAt = null;
+      }
+      await db.runTransaction(async (tx) => {
+        tx.delete(oldRef);
+        tx.set(ref, {
+          title,
+          slug,
+          featuredImageUrl,
+          excerpt,
+          body: bodyHtml,
+          metaTitle,
+          metaDescription,
+          published,
+          publishedAt,
+          authorName,
+          createdAt,
+          updatedAt: now,
+        });
+      });
+      return res.json({ success: true, slug });
+    }
+
+    const snap = await ref.get();
+    const isCreate = !snap.exists;
+    const prev = snap.exists ? snap.data() || {} : {};
+
+    let publishedAt = prev.publishedAt || null;
+    if (published && !prev.published) {
+      publishedAt = now;
+    }
+    if (!published) {
+      publishedAt = null;
+    }
+
+    const payload = {
+      title,
+      slug,
+      featuredImageUrl,
+      excerpt,
+      body: bodyHtml,
+      metaTitle,
+      metaDescription,
+      published,
+      publishedAt,
+      authorName,
+      updatedAt: now,
+    };
+
+    if (isCreate) {
+      payload.createdAt = now;
+    } else {
+      payload.createdAt = prev.createdAt || now;
+    }
+
+    await ref.set(payload, { merge: true });
+    return res.json({ success: true, slug });
+  } catch (err) {
+    console.error("upsertArticle", err);
+    return res.status(500).json({ success: false, error: err.message || "Save failed" });
+  }
+}
+
 async function handleAdminDashboardApi(req, res) {
+  // DEBUG START
+  console.log("AUTH HEADERS:", req.headers.authorization);
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : null;
+  console.log("TOKEN EXISTS:", !!token);
+  // DEBUG END
+
   const user = await verifyAdmin(req, res);
   if (!user) return;
   if (req.method === "GET") {
     const action = req.query && req.query.action;
     if (action === "stats") return getAdminDashboardStats(req, res);
+    if (action === "logbookSubmissions") return getLogbookSubmissionsForAdmin(req, res);
+    if (action === "articlesAdmin") return getArticlesAdmin(req, res);
     return getAdminDashboardData(req, res);
   }
   if (req.method !== "POST") return res.status(405).json({ success: false, error: "Method not allowed" });
   const action = req.body && req.body.action;
   if (!action) return res.status(400).json({ success: false, error: "Missing action" });
+  if (action === "upsertArticle") return upsertArticle(req, res, user);
+  if (action === "resanitizeArticleBodies") return resanitizeAllArticleBodies(req, res);
   if (action === "approveAd") return approveAd(req, res);
   if (action === "rejectAd") return rejectAd(req, res);
+  if (action === "deleteAd") return deleteAd(req, res);
   if (action === "approveReview") return approveReview(req, res);
   if (action === "approveToolSubmission") return approveToolSubmission(req, res);
   if (action === "rejectToolSubmission") return rejectToolSubmission(req, res);

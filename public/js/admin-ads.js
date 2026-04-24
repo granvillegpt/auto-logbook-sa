@@ -33,15 +33,13 @@
 
   if (!pendingEl || !waitingPaymentEl || !liveAdsEl || !expiredAdsEl || !rejectedEl) return;
 
-  /** Same target as admin.js — Hosting SPA rewrites break relative /adminDashboardApi in local dev. */
-  var ADMIN_API_URL =
-    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://127.0.0.1:5007/autologbook-sa/us-central1/adminDashboardApi'
-      : '/adminDashboardApi';
+  var activeAdsTab = 'pending';
 
   var IS_DEV =
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1';
+
+  var sponsoredToolsListenerUnsub = null;
 
   function postApproveAd(adId) {
     return new Promise(function (resolve, reject) {
@@ -51,37 +49,31 @@
       }
       var user = firebase.auth().currentUser;
       if (!user) {
+        alert('User not authenticated');
         reject(new Error('Not logged in'));
         return;
       }
       user
         .getIdToken()
-        .then(function (token) {
-          return fetch(ADMIN_API_URL, {
+        .then(function (idToken) {
+          // DEBUG START
+          console.log('ID TOKEN:', idToken);
+          // DEBUG END
+          return fetch('/api/admin-dashboard', {
             method: 'POST',
             headers: {
-              Authorization: 'Bearer ' + token,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + idToken
             },
             body: JSON.stringify({ action: 'approveAd', adId: adId })
           });
         })
         .then(function (res) {
-          return res.text().then(function (text) {
-            console.log('RAW RESPONSE:', text);
-            var body;
-            try {
-              body = JSON.parse(text);
-            } catch (_parseErr) {
-              throw new Error(
-                'Server did not return JSON (got HTML or empty). Check ADMIN_API_URL / Functions emulator.'
-              );
+          return res.json().then(function (data) {
+            if (!res.ok || !data.success) {
+              throw new Error((data && data.error) || 'Action failed');
             }
-            if (!res.ok || (body && body.success === false)) {
-              var msg = (body && body.error) ? String(body.error) : res.statusText || 'Request failed';
-              throw new Error(msg);
-            }
-            return body;
+            return data;
           });
         })
         .then(resolve)
@@ -144,26 +136,104 @@
     return false;
   }
 
-  function renderAdRow(tool, docId, actionType) {
+  function formatSlotType(slot) {
+    var key =
+      window.AdBooking && typeof window.AdBooking.canonicalSlotKey === 'function'
+        ? window.AdBooking.canonicalSlotKey(slot)
+        : '';
+    var map = {
+      featured: 'Featured',
+      slot1: 'Slot 1',
+      slot2: 'Slot 2',
+      slot3: 'Slot 3'
+    };
+    if (key && map[key]) return map[key];
+    var s = slot != null ? String(slot).trim() : '';
+    return s || '—';
+  }
+
+  function paidAtMs(data) {
+    if (!data || data.paidAt == null) return null;
+    var p = data.paidAt;
+    if (typeof p.toMillis === 'function') return p.toMillis();
+    if (typeof p.toDate === 'function') {
+      var d = p.toDate();
+      return d && !isNaN(d.getTime()) ? d.getTime() : null;
+    }
+    if (typeof p.seconds === 'number') return p.seconds * 1000;
+    if (typeof p === 'number') return p;
+    return null;
+  }
+
+  function updateAdsMetrics(flatDocs) {
+    var liveCount = 0;
+    var pendingCount = 0;
+    var totalLiveClicks = 0;
+    var totalLiveViews = 0;
+    var now = new Date();
+    var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    var monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+    var monthRevenue = 0;
+
+    flatDocs.forEach(function (doc) {
+      var data = doc || {};
+      var st = normalizeStatus(data.status);
+      if (st === STATUS.LIVE) {
+        liveCount++;
+        totalLiveClicks += Number(data.clicks) || 0;
+        totalLiveViews += Number(data.views) || 0;
+      }
+      if (st === STATUS.PENDING) pendingCount++;
+
+      var paidMs = paidAtMs(data);
+      if (paidMs != null && paidMs >= monthStart && paidMs <= monthEnd) {
+        var amt = Number(data.amount);
+        if (Number.isFinite(amt)) monthRevenue += amt;
+      }
+    });
+
+    var avgCtr = totalLiveViews > 0 ? (totalLiveClicks / totalLiveViews) * 100 : 0;
+
+    var elLive = document.getElementById('adsMetricLive');
+    var elPending = document.getElementById('adsMetricPending');
+    var elRev = document.getElementById('adsMetricMonthlyRevenue');
+    var elCtr = document.getElementById('adsMetricAvgCtr');
+    if (elLive) elLive.textContent = String(liveCount);
+    if (elPending) elPending.textContent = String(pendingCount);
+    if (elRev) elRev.textContent = 'R' + monthRevenue.toLocaleString();
+    if (elCtr) elCtr.textContent = avgCtr.toFixed(1) + '%';
+  }
+
+  var DESC_PREVIEW = 120;
+
+  function renderDescriptionBlock(descriptionRaw) {
+    var d = descriptionRaw != null ? String(descriptionRaw).trim() : '';
+    if (!d) return '';
+    if (d.length <= DESC_PREVIEW) {
+      return '<p class="admin-ad-desc">' + escapeHtml(d) + '</p>';
+    }
+    return (
+      '<div class="admin-ad-desc-wrap">' +
+      '<p class="admin-ad-desc">' +
+      '<span class="admin-ad-desc-preview">' +
+      escapeHtml(d.slice(0, DESC_PREVIEW)) +
+      '…</span>' +
+      '<span class="admin-ad-desc-full" hidden>' +
+      escapeHtml(d) +
+      '</span>' +
+      '</p>' +
+      '<button type="button" class="btn btn-secondary admin-ad-desc-toggle" style="margin-top:6px;padding:4px 12px;font-size:12px;">Show more</button>' +
+      '</div>'
+    );
+  }
+
+  function renderAdCard(tool, docId, actionType) {
     var fromImage = tool.image && String(tool.image).trim();
     var imageSrc = fromImage ? fromImage : DEFAULT_AD_IMAGE;
     if (imageSrc === DEFAULT_AD_IMAGE) {
       var fromLogo = tool.logo && String(tool.logo).trim();
       if (fromLogo) imageSrc = fromLogo;
     }
-    var logo = '<img src="' + escapeHtml(imageSrc) + '" class="sponsored-tool-logo" alt="Tool Logo">';
-    var toolName = escapeHtml((tool.toolName && tool.toolName.trim()) || 'Unnamed Tool');
-    var companyName = escapeHtml((tool.companyName && tool.companyName.trim()) || '');
-    var description = escapeHtml((tool.description && tool.description.trim()) || '');
-    var urlRaw = (tool.url && String(tool.url).trim()) || (tool.website && String(tool.website).trim());
-    var hasUrl = !!urlRaw;
-    var website = hasUrl ? safeUrl(urlRaw) : '';
-    var websiteDisplay =
-      hasUrl && website
-        ? '<a href="' +
-          escapeHtml(website) +
-          '" target="_blank" rel="noopener" class="btn-outline" style="display:inline-block; margin-top:8px;">Visit</a>'
-        : '';
     var clicks = Number(tool.clicks) || 0;
     var views = Number(tool.views) || 0;
     var ctrStr = views > 0 ? ((clicks / views) * 100).toFixed(1) : '0.0';
@@ -171,140 +241,141 @@
     var status = rawStatus || (actionType === 'waiting_payment' ? 'approved' : actionType);
     var statusBadge = '<span class="status-badge ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span>';
 
-    var actionsHtml = '';
+    var businessName = escapeHtml(
+      (tool.companyName && tool.companyName.trim()) ||
+        (tool.toolName && tool.toolName.trim()) ||
+        'Unnamed'
+    );
+    var slotLabel = escapeHtml(formatSlotType(tool.slot));
+
+    var urlRaw =
+      (tool.url && String(tool.url).trim()) || (tool.website && String(tool.website).trim());
+    var hasUrl = !!urlRaw;
+    var website = hasUrl ? safeUrl(urlRaw) : '';
+
+    var viewAdControl =
+      hasUrl && website
+        ? '<a href="' +
+          escapeHtml(website) +
+          '" target="_blank" rel="noopener" class="btn btn-primary">View Ad</a>'
+        : '<button type="button" class="btn btn-primary" disabled title="No URL">View Ad</button>';
+
+    var pauseBtn =
+      '<button type="button" class="btn btn-secondary admin-ad-pause-btn" disabled title="Coming soon">Pause</button>';
+
+    var deleteBtn =
+      '<button type="button" class="btn btn-secondary admin-btn-delete" data-id="' +
+      escapeHtml(docId) +
+      '">Delete</button>';
+
+    var descBlock = renderDescriptionBlock(tool.description);
+
+    var actionsInner = '';
     if (actionType === 'pending') {
-      actionsHtml =
-        '<div class="admin-ads-actions">' +
+      actionsInner =
         '<button type="button" class="btn btn-primary admin-btn-approve" data-tool-id="' +
         escapeHtml(docId) +
-        '">Approve</button> ' +
+        '">Approve</button>' +
         '<button type="button" class="btn btn-secondary admin-btn-reject" data-tool-id="' +
         escapeHtml(docId) +
-        '">Reject</button> ' +
-        '<button type="button" class="btn btn-secondary admin-btn-delete" data-id="' +
-        escapeHtml(docId) +
-        '">Delete</button>' +
-        '</div>';
-    } else if (actionType === 'waiting_payment') {
-      actionsHtml =
-        '<div class="admin-ads-actions">' +
-        '<button type="button" class="btn btn-secondary admin-btn-delete" data-id="' +
-        escapeHtml(docId) +
-        '">Delete</button>' +
-        '</div>';
-    } else if (actionType === 'live') {
-      var visitBtn =
-        hasUrl && website
-          ? '<a href="' +
-            escapeHtml(website) +
-            '" target="_blank" rel="noopener" class="btn btn-primary" style="text-decoration:none;">Visit</a> '
-          : '';
-      actionsHtml =
-        '<div class="admin-ads-actions">' +
-        visitBtn +
-        '<button type="button" class="btn btn-secondary admin-btn-delete" data-id="' +
-        escapeHtml(docId) +
-        '">Delete</button>' +
-        '</div>';
+        '">Reject</button>' +
+        deleteBtn;
     } else {
-      actionsHtml =
-        '<div class="admin-ads-actions">' +
-        '<button type="button" class="btn btn-secondary admin-btn-delete" data-id="' +
-        escapeHtml(docId) +
-        '">Delete</button>' +
-        '</div>';
+      actionsInner = viewAdControl + pauseBtn + deleteBtn;
     }
 
-    var hideWebsite = actionType === 'live' || actionType === 'expired' || actionType === 'rejected';
-    var adCell =
-      '<div>' +
-      logo +
-      '<h3 style="margin:8px 0 4px;">' +
-      toolName +
-      '</h3>' +
-      statusBadge +
-      (companyName ? '<p style="margin:0; font-size:14px; color: var(--text-muted);">' + companyName + '</p>' : '') +
-      (description ? '<p style="margin-top:8px;">' + description + '</p>' : '') +
-      (hideWebsite ? '' : websiteDisplay) +
-      '</div>';
-
     return (
-      '<tr class="admin-ad-row" data-tool-id="' +
+      '<article class="admin-sponsored-ad-card" data-tool-id="' +
       escapeHtml(docId) +
       '">' +
-      '<td class="admin-ad-cell">' +
-      adCell +
-      '</td>' +
-      '<td class="admin-ad-cell-numeric">' +
-      clicks +
-      '</td>' +
-      '<td class="admin-ad-cell-numeric">' +
+      '<img class="admin-sponsored-ad-card__img" src="' +
+      escapeHtml(imageSrc) +
+      '" alt="">' +
+      '<div class="admin-sponsored-ad-card__body">' +
+      '<h3 class="admin-sponsored-ad-card__title">' +
+      businessName +
+      '</h3>' +
+      '<div class="admin-sponsored-ad-card__meta">' +
+      '<span>Slot: ' +
+      slotLabel +
+      '</span> ' +
+      statusBadge +
+      '</div>' +
+      '<dl class="admin-sponsored-ad-card__stats">' +
+      '<div><dt>Views</dt><dd>' +
       views +
-      '</td>' +
-      '<td class="admin-ad-cell-numeric">' +
+      '</dd></div>' +
+      '<div><dt>Clicks</dt><dd>' +
+      clicks +
+      '</dd></div>' +
+      '<div><dt>CTR</dt><dd>' +
       ctrStr +
-      '%</td>' +
-      '<td class="admin-ad-cell-actions">' +
-      actionsHtml +
-      '</td>' +
-      '</tr>'
+      '%</dd></div>' +
+      '</dl>' +
+      descBlock +
+      '</div>' +
+      '<div class="admin-sponsored-ad-card__actions">' +
+      actionsInner +
+      '</div>' +
+      '</article>'
     );
   }
 
-  function wrapAdTable(bodyRowsHtml) {
-    return (
-      '<table class="admin-sponsored-table">' +
-      '<thead><tr><th>Ad</th><th>Clicks</th><th>Views</th><th>CTR</th><th></th></tr></thead>' +
-      '<tbody>' +
-      bodyRowsHtml +
-      '</tbody>' +
-      '</table>'
-    );
-  }
-
-  function emptyMsg() {
-    return '<p style="color: var(--text-muted);">No ads yet.</p>';
+  function emptyGridMsg() {
+    return '<p class="admin-sponsored-empty">No ads in this category.</p>';
   }
 
   function setAll(msg) {
-    var p = '<p style="color: var(--text-muted);">' + escapeHtml(msg) + '</p>';
+    var p = '<p class="admin-sponsored-empty">' + escapeHtml(msg) + '</p>';
     pendingEl.innerHTML = p;
     waitingPaymentEl.innerHTML = p;
     liveAdsEl.innerHTML = p;
     expiredAdsEl.innerHTML = p;
     rejectedEl.innerHTML = p;
+    updateAdsMetrics([]);
+    syncAdsTab();
   }
 
   function render() {
-    Promise.all([
-      fetchAdsByStatus('pending'),
-      fetchAdsByStatus('approved'),
-      fetchAdsByStatus('live'),
-      fetchAdsByStatus('expired'),
-      fetchAdsByStatus('rejected')
-    ])
-      .then(function (responses) {
-        var snapshot = []
-          .concat(responses[0] || [])
-          .concat(responses[1] || [])
-          .concat(responses[2] || [])
-          .concat(responses[3] || [])
-          .concat(responses[4] || []);
-        var validStatuses = ['pending', 'approved', 'live', 'expired', 'rejected'];
+    if (!window.db) {
+      setAll('Could not load ads. Please try again later.');
+      return;
+    }
+    if (sponsoredToolsListenerUnsub) {
+      return;
+    }
+    sponsoredToolsListenerUnsub = window.db.collection('sponsoredTools').onSnapshot(
+      function (snap) {
+        console.log('🔥 ADMIN REALTIME UPDATE:', snap.size);
+        var rawReviews = [];
         var pending = [];
+        var approved = [];
+        var rejected = [];
         var waitingPayment = [];
         var live = [];
         var expired = [];
-        var rejected = [];
+        pendingEl.innerHTML = '';
+        waitingPaymentEl.innerHTML = '';
+        liveAdsEl.innerHTML = '';
+        expiredAdsEl.innerHTML = '';
+        rejectedEl.innerHTML = '';
+        var snapshot = snap.docs.map(function (d) {
+          return { id: d.id, ...d.data() };
+        });
+        var validStatuses = ['pending', 'approved', 'live', 'expired', 'rejected'];
 
         if (!snapshot.length) {
-          pendingEl.innerHTML = emptyMsg();
-          waitingPaymentEl.innerHTML = emptyMsg();
-          liveAdsEl.innerHTML = emptyMsg();
-          expiredAdsEl.innerHTML = emptyMsg();
-          rejectedEl.innerHTML = emptyMsg();
+          updateAdsMetrics([]);
+          pendingEl.innerHTML = emptyGridMsg();
+          waitingPaymentEl.innerHTML = emptyGridMsg();
+          liveAdsEl.innerHTML = emptyGridMsg();
+          expiredAdsEl.innerHTML = emptyGridMsg();
+          rejectedEl.innerHTML = emptyGridMsg();
+          syncAdsTab();
           return;
         }
+
+        updateAdsMetrics(snapshot);
 
         snapshot.forEach(function (doc) {
           var data = doc || {};
@@ -321,44 +392,34 @@
         });
 
         pendingEl.innerHTML = pending.length
-          ? wrapAdTable(
-              sortAdItemsByClicksDesc(pending)
-                .map(function (t) { return renderAdRow(t.data, t.id, 'pending'); })
-                .join('')
-            )
-          : emptyMsg();
+          ? sortAdItemsByClicksDesc(pending)
+              .map(function (t) { return renderAdCard(t.data, t.id, 'pending'); })
+              .join('')
+          : emptyGridMsg();
 
         waitingPaymentEl.innerHTML = waitingPayment.length
-          ? wrapAdTable(
-              sortAdItemsByClicksDesc(waitingPayment)
-                .map(function (t) { return renderAdRow(t.data, t.id, 'waiting_payment'); })
-                .join('')
-            )
-          : emptyMsg();
+          ? sortAdItemsByClicksDesc(waitingPayment)
+              .map(function (t) { return renderAdCard(t.data, t.id, 'waiting_payment'); })
+              .join('')
+          : emptyGridMsg();
 
         liveAdsEl.innerHTML = live.length
-          ? wrapAdTable(
-              sortAdItemsByClicksDesc(live)
-                .map(function (t) { return renderAdRow(t.data, t.id, 'live'); })
-                .join('')
-            )
-          : emptyMsg();
+          ? sortAdItemsByClicksDesc(live)
+              .map(function (t) { return renderAdCard(t.data, t.id, 'live'); })
+              .join('')
+          : emptyGridMsg();
 
         expiredAdsEl.innerHTML = expired.length
-          ? wrapAdTable(
-              sortAdItemsByClicksDesc(expired)
-                .map(function (t) { return renderAdRow(t.data, t.id, 'expired'); })
-                .join('')
-            )
-          : emptyMsg();
+          ? sortAdItemsByClicksDesc(expired)
+              .map(function (t) { return renderAdCard(t.data, t.id, 'expired'); })
+              .join('')
+          : emptyGridMsg();
 
         rejectedEl.innerHTML = rejected.length
-          ? wrapAdTable(
-              sortAdItemsByClicksDesc(rejected)
-                .map(function (t) { return renderAdRow(t.data, t.id, 'rejected'); })
-                .join('')
-            )
-          : emptyMsg();
+          ? sortAdItemsByClicksDesc(rejected)
+              .map(function (t) { return renderAdCard(t.data, t.id, 'rejected'); })
+              .join('')
+          : emptyGridMsg();
 
         pendingEl.querySelectorAll('.admin-btn-approve').forEach(function (btn) {
           btn.addEventListener('click', async function () {
@@ -409,25 +470,49 @@
         });
 
         pendingEl.querySelectorAll('.admin-btn-reject').forEach(function (btn) {
-          btn.addEventListener('click', function () {
+          btn.addEventListener('click', async function () {
             var id = btn.getAttribute('data-tool-id');
             if (!id) return;
             btn.disabled = true;
-            window.db.collection('sponsoredTools').doc(String(id)).update({ status: 'rejected' })
-              .then(render)
-              .catch(function (err) {
+            try {
+              var authUser = firebase.auth().currentUser;
+              if (!authUser) {
+                alert('User not authenticated');
                 btn.disabled = false;
-                console.error(err);
+                return;
+              }
+              const idToken = await authUser.getIdToken();
+              // DEBUG START
+              console.log('ID TOKEN:', idToken);
+              // DEBUG END
+              const res = await fetch('/api/admin-dashboard', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + idToken
+                },
+                body: JSON.stringify({ action: 'rejectAd', adId: id })
               });
+              const data = await res.json();
+              if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Action failed');
+              }
+              render();
+            } catch (err) {
+              btn.disabled = false;
+              console.error(err);
+              alert(err && err.message ? err.message : 'Reject failed');
+            }
           });
         });
 
-        applyAdsFilter();
-      })
-      .catch(function (err) {
+        syncAdsTab();
+      },
+      function (err) {
         setAll('Could not load ads. Please try again later.');
         if (console && console.error) console.error(err);
-      });
+      }
+    );
   }
 
   firebase.auth().onAuthStateChanged(async function (user) {
@@ -446,45 +531,89 @@
   });
 
   document.addEventListener('click', async function (e) {
-    if (e.target.classList.contains('admin-btn-delete')) {
-      var id = e.target.dataset.id;
+    var delBtn = e.target.closest && e.target.closest('.admin-btn-delete');
+    if (delBtn && delBtn.classList.contains('admin-btn-delete')) {
+      var id = delBtn.dataset.id;
       if (!id) return;
-      await window.db.collection('sponsoredTools').doc(id).delete();
-      location.reload();
+      try {
+        var authUser = firebase.auth().currentUser;
+        if (!authUser) {
+          alert('User not authenticated');
+          return;
+        }
+        var idToken = await authUser.getIdToken();
+        // DEBUG START
+        console.log('ID TOKEN:', idToken);
+        // DEBUG END
+        var res = await fetch('/api/admin-dashboard', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + idToken
+          },
+          body: JSON.stringify({
+            action: 'deleteAd',
+            adId: id
+          })
+        });
+        var data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Action failed');
+        }
+        location.reload();
+      } catch (err) {
+        alert(err && err.message ? err.message : 'Delete failed');
+        if (console && console.error) console.error(err);
+      }
     }
   });
 
-  function applyAdsFilter() {
-    var filter = document.getElementById('adsFilter');
-    if (!filter) return;
-
-    var selected = filter.value;
-
-    var sections = {
-      pending: document.getElementById('pendingAds'),
-      approved: document.getElementById('waitingPaymentAds'),
-      live: document.getElementById('liveAds'),
-      expired: document.getElementById('expiredAds'),
-      rejected: document.getElementById('rejectedAds')
-    };
-
-    Object.keys(sections).forEach(function (key) {
-      var el = sections[key];
-      if (!el) return;
-      var sectionEl = el.closest('section');
-      if (!sectionEl) return;
-
-      if (selected === 'all') {
-        sectionEl.style.removeProperty('display');
-      } else {
-        if (key === selected) {
-          sectionEl.style.removeProperty('display');
-        } else {
-          sectionEl.style.display = 'none';
-        }
-      }
+  function setAdsTab(tabKey) {
+    activeAdsTab = tabKey;
+    var tabs = document.querySelectorAll('#adsPanel .admin-ads-tab');
+    tabs.forEach(function (btn) {
+      var k = btn.getAttribute('data-ads-tab');
+      var on = k === tabKey;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('#adsPanel .admin-ads-panel-section').forEach(function (sec) {
+      var k = sec.getAttribute('data-ads-section');
+      sec.hidden = k !== tabKey;
     });
   }
 
-  document.getElementById('adsFilter')?.addEventListener('change', applyAdsFilter);
+  function syncAdsTab() {
+    setAdsTab(activeAdsTab);
+  }
+
+  var adsPanelEl = document.getElementById('adsPanel');
+  if (adsPanelEl) {
+    adsPanelEl.addEventListener('click', function (e) {
+      var tabBtn = e.target.closest && e.target.closest('.admin-ads-tab');
+      if (!tabBtn || !adsPanelEl.contains(tabBtn)) return;
+      var k = tabBtn.getAttribute('data-ads-tab');
+      if (k) setAdsTab(k);
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var toggle = e.target.closest && e.target.closest('.admin-ad-desc-toggle');
+    if (!toggle || !adsPanelEl || !adsPanelEl.contains(toggle)) return;
+    var wrap = toggle.closest('.admin-ad-desc-wrap');
+    if (!wrap) return;
+    var preview = wrap.querySelector('.admin-ad-desc-preview');
+    var full = wrap.querySelector('.admin-ad-desc-full');
+    if (!preview || !full) return;
+    var expanded = !full.hasAttribute('hidden');
+    if (!expanded) {
+      preview.setAttribute('hidden', '');
+      full.removeAttribute('hidden');
+      toggle.textContent = 'Show less';
+    } else {
+      full.setAttribute('hidden', '');
+      preview.removeAttribute('hidden');
+      toggle.textContent = 'Show more';
+    }
+  });
 })();

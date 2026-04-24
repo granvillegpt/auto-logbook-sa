@@ -1,5 +1,8 @@
 // resolver-query-v2 (force redeploy)
 const crypto = require("crypto");
+const https = require("https");
+const querystring = require("querystring");
+const PAYFAST_HOST = "www.payfast.co.za";
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -12,19 +15,54 @@ try {
 } catch (err) {
   console.error("🔥 src/index FAILED TO LOAD:", err.message);
 }
+const cors = require("cors");
 const { handlePaymentWebhook } = require("./src/paymentWebhook");
 const { handleAdminDashboardApi } = require("./src/adminDashboardApi");
 const { endDateValueToISOString } = require("./src/adBookingHelpers");
 const { sendGridEmail, SENDGRID_API_KEY } = require("./src/email");
+const {
+  getLogbookAccessTokenFromRequest,
+  consumeLogbookToken,
+  isAdminRequest,
+} = require("./src/resolveStoreGate");
 
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+const { assignAdminOnUserCreate, setAdminByEmail } = require("./src/authTriggers");
+exports.assignAdminOnUserCreate = assignAdminOnUserCreate;
+exports.setAdminByEmail = setAdminByEmail;
+
 const payfastPassphrase = defineSecret("PAYFAST_PASSPHRASE");
 const LOGBOOK_TEMPLATE_ID = "d-b4f86a57a18a4be083f9eb8700162203";
 
-exports.api = onRequest(app);
+const apiCors = cors({
+  origin: true,
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Logbook-Token",
+    "x-logbook-token",
+    "x-logbook-key",
+    "X-Request-Id",
+    "x-request-id",
+    "x-admin-key",
+    "X-Admin-Dashboard",
+    "x-admin-dashboard",
+  ],
+});
+
+exports.api = onRequest(
+  {
+    region: "us-central1",
+    secrets: ["SENDGRID_API_KEY"]
+  },
+  (req, res) => {
+    return apiCors(req, res, () => app(req, res));
+  }
+);
 
 const paymentWebhookApp = express();
 paymentWebhookApp.use(express.urlencoded({ extended: true }));
@@ -70,26 +108,6 @@ function parsePositiveInteger(value) {
   return Number.isInteger(n) && n >= 1 ? n : null;
 }
 
-function generateSignature(data, passphrase = "") {
-  const payload = { ...(data && typeof data === "object" ? data : {}) };
-  delete payload.signature;
-
-  const sortedKeys = Object.keys(payload).sort();
-
-  let queryString = sortedKeys
-    .map(
-      (key) =>
-        `${key}=${encodeURIComponent(String(payload[key] ?? "")).replace(/%20/g, "+")}`
-    )
-    .join("&");
-
-  if (passphrase) {
-    queryString += `&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, "+")}`;
-  }
-
-  return crypto.createHash("md5").update(queryString).digest("hex");
-}
-
 function expiresAtToMs(v) {
   if (v == null) return null;
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -98,64 +116,130 @@ function expiresAtToMs(v) {
   return null;
 }
 
-exports.payfastNotify = onRequest(
-  {
-    region: "us-central1",
-    secrets: [SENDGRID_API_KEY, payfastPassphrase],
-  },
-  async (req, res) => {
+function verifyWithPayfast(body) {
+  return new Promise((resolve, reject) => {
+    console.log("🌐 PAYFAST VERIFY HOST:", PAYFAST_HOST);
+    const postData = querystring.stringify({
+      ...body,
+      cmd: "_notify-validate",
+    });
+
+    const options = {
+      hostname: PAYFAST_HOST,
+      path: "/eng/query/validate",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(postData),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        resolve(data.trim() === "VALID");
+      });
+    });
+
+    req.on("error", reject);
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+const payfastNotifyApp = express();
+payfastNotifyApp.use(express.urlencoded({ extended: false }));
+
+payfastNotifyApp.post("/", async (req, res) => {
+  try {
+    console.log("🔥 ITN RECEIVED");
+    console.log("🔥 PAYFAST HIT");
+    console.log("🔥 HEADERS:", req.headers);
+
     const body = req.body;
+
+    console.log("📦 RAW BODY OBJECT:", body);
+
     if (!body || typeof body !== "object") {
       return res.status(400).send("Invalid payload");
     }
-    const passphrase = process.env.PAYFAST_PASSPHRASE || "";
-    const generated = generateSignature(body, passphrase);
-    const received = body.signature;
-    if (
-      !received ||
-      String(generated).toLowerCase() !== String(received).toLowerCase()
-    ) {
-      return res.status(400).send("Invalid signature");
+
+    const isValid = await verifyWithPayfast(body);
+
+    if (!isValid) {
+      console.error("❌ PAYFAST VALIDATION FAILED");
+      return res.status(400).send("Invalid payment");
     }
-    res.status(200).send("OK");
-    processPayfastPayment(body).catch(console.error);
+
+    console.log("✅ PAYFAST VERIFIED");
+
+    await processPayfastPayment(body);
+
+    return res.status(200).send("OK");
+  } catch (err) {
+    console.error("🔥 PAYFAST ERROR:", err);
+    return res.status(500).send("Processing failed");
   }
+});
+
+exports.payfastNotify = onRequest(
+  {
+    region: "us-central1",
+    secrets: [SENDGRID_API_KEY],
+  },
+  payfastNotifyApp
 );
 
+/** PayFast ITN buyer email: known fields first, then any single value that looks like an email. */
+function resolvePayerEmailFromPayfastBody(body) {
+  if (!body || typeof body !== "object") return "";
+  const preferred = [
+    body.email_address,
+    body.email,
+    body.from_email,
+    body.buyer_email,
+  ];
+  for (let i = 0; i < preferred.length; i++) {
+    const s = String(preferred[i] == null ? "" : preferred[i]).trim();
+    if (s.includes("@")) return s;
+  }
+  const keys = Object.keys(body);
+  for (let j = 0; j < keys.length; j++) {
+    const v = String(body[keys[j]] == null ? "" : body[keys[j]]).trim();
+    if (!v.includes("@") || v.length > 254) continue;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return v;
+  }
+  return "";
+}
+
 async function processPayfastPayment(body) {
-  console.log("PAYFAST BODY:", body);
+  console.log("💰 PAYFAST BODY:", body);
 
-  if (!body || body.payment_status !== "COMPLETE") {
+  if (!body || String(body.payment_status || "").toUpperCase() !== "COMPLETE") {
     console.log("IGNORED PAYMENT:", body?.payment_status);
-    return;
-  }
-
-  const m_payment_id = String(body.m_payment_id || "").trim();
-  if (!m_payment_id) {
-    console.error("MISSING PAYMENT ID", body);
-    return;
-  }
-
-  if (body.payment_status !== "COMPLETE") {
-    console.log("PAYMENT NOT COMPLETE:", body.payment_status);
     return;
   }
 
   const isAdPayment = String(body.custom_str2 || "").toLowerCase() === "ad";
 
   if (isAdPayment) {
-    const adRef = admin.firestore().collection("sponsoredTools").doc(m_payment_id);
+    const adIdStr = String(body.m_payment_id || "").trim();
+    if (!adIdStr) {
+      console.error("NO AD ID IN PAYMENT:", body);
+      return;
+    }
+    const adRef = admin.firestore().collection("sponsoredTools").doc(adIdStr);
     const adSnap = await adRef.get();
     if (!adSnap.exists) {
-      console.error("AD NOT FOUND FOR PAYMENT", m_payment_id);
+      console.error("AD NOT FOUND FOR PAYMENT", adIdStr);
       return;
     }
     const adData = adSnap.data() || {};
     const monthsRaw = String(body.custom_str1 || "").trim();
     let months = parseInt(monthsRaw, 10);
-    if (!months || months < 1) {
-      months = 1;
-    }
+    if (!months || months < 1) months = 1;
     const now = Date.now();
     const expMs = expiresAtToMs(adData.expiresAt);
     if (
@@ -177,60 +261,149 @@ async function processPayfastPayment(body) {
       monthsPurchased: months,
       expiresAt: expiry,
     });
-    console.log("AD ACTIVATED:", {
-      id: m_payment_id,
-      months,
-      expiresAt: expiry,
-    });
+    console.log("AD ACTIVATED:", { id: adIdStr, months, expiresAt: expiry });
     return;
   }
 
-  const candidateEmails = [
-    body.email_address,
-    body.email,
-    body.custom_str1,
-  ].map((v) => String(v || "").trim()).filter(Boolean);
-  const email = candidateEmails.find((v) => v.includes("@"));
-
-  if (!email) {
-    console.error("NO EMAIL FOUND");
+  const tokenDocId = String(
+    body.m_payment_id || body.pf_payment_id || ""
+  ).trim();
+  if (!tokenDocId) {
+    console.error("MISSING TOKEN / MERCHANT PAYMENT ID", body);
     return;
   }
 
-  await admin.firestore()
+  const tokenRef = admin.firestore()
     .collection("logbook_tokens")
-    .doc(m_payment_id)
-    .set({
-      remaining: 3,
-      createdAt: Date.now()
+    .doc(tokenDocId);
+
+  const existing = await tokenRef.get();
+
+  if (existing.exists) {
+    console.log("⚠️ DUPLICATE ITN — EMAIL SKIPPED");
+    return;
+  }
+
+  const email = resolvePayerEmailFromPayfastBody(body);
+  if (!email) {
+    console.error("NO PAYER EMAIL IN PAYFAST ITN", {
+      keys: body && typeof body === "object" ? Object.keys(body) : [],
     });
-  const download_url = `https://autologbooksa.co.za/logbook.html?token=${encodeURIComponent(m_payment_id)}`;
+    return;
+  }
+
+  const rawQty = Number(body.custom_str4);
+  const quantity = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+  const tokensPerLogbook = 3;
+  const nTokens = quantity * tokensPerLogbook;
+
+  await admin
+    .firestore()
+    .collection("logbook_tokens")
+    .doc(tokenDocId)
+    .set({
+      remaining: nTokens,
+      uploadsRemaining: quantity * 3,
+      createdAt: Date.now(),
+    });
+
+  const practitionerCode = String(body.custom_str5 || "").trim().toUpperCase();
+  if (practitionerCode) {
+    const ledgerRef = admin
+      .firestore()
+      .collection("practitioner_payment_ledger")
+      .doc(tokenDocId);
+    const codeRef = admin
+      .firestore()
+      .collection("practitioner_codes")
+      .doc(practitionerCode);
+    const preSnap = await codeRef.get();
+    if (preSnap.exists) {
+      const preData = preSnap.data() || {};
+      const usageLimit = Number(preData.usageLimit || 0);
+      const usageCount = Number(preData.usageCount || 0);
+      if (usageLimit > 0 && usageCount >= usageLimit) {
+        console.log(
+          "PRACTITIONER LIMIT REACHED — SKIPPING INCREMENT:",
+          practitionerCode
+        );
+      } else {
+        try {
+          const didIncrement = await admin.firestore().runTransaction(
+            async (tx) => {
+              const ledgerSnap = await tx.get(ledgerRef);
+              if (ledgerSnap.exists) {
+                return false;
+              }
+              const codeSnap = await tx.get(codeRef);
+              if (!codeSnap.exists) {
+                return false;
+              }
+              const codeData = codeSnap.data() || {};
+              if (codeData.active === false) {
+                return false;
+              }
+              const ul = Number(codeData.usageLimit);
+              const uc = Number(codeData.usageCount || 0);
+              if (Number.isFinite(ul) && ul > 0 && uc >= ul) {
+                return false;
+              }
+              tx.set(ledgerRef, {
+                code: practitionerCode,
+                pf_payment_id: tokenDocId,
+                createdAt: FieldValue.serverTimestamp(),
+              });
+              tx.update(codeRef, {
+                usageCount: FieldValue.increment(1),
+              });
+              return true;
+            }
+          );
+          if (didIncrement) {
+            console.log("PRACTITIONER USAGE INCREMENTED:", practitionerCode);
+          }
+        } catch (pracErr) {
+          console.error("PRACTITIONER USAGE INCREMENT ERROR:", pracErr);
+        }
+      }
+    }
+  }
+
+  const download_url = `https://autologbooksa.co.za/logbook.html?token=${encodeURIComponent(
+    tokenDocId
+  )}`;
   console.log("FINAL EMAIL LINK:", download_url);
 
-  if (!download_url || !download_url.includes("?token=") || !m_payment_id) {
-    console.error("MISSING DOWNLOAD URL", { body });
+  const paymentId = String(body.pf_payment_id || "").trim();
+  if (paymentId) {
+    await admin
+      .firestore()
+      .collection("payfast_payments")
+      .doc(paymentId)
+      .set({
+        email,
+        payment_status: body.payment_status,
+        amount: body.amount_gross,
+        type: String(body.custom_str2 || "logbook"),
+        token: tokenDocId,
+        createdAt: Date.now(),
+      });
   }
 
-  console.log("EMAIL DEBUG:", {
-    to: email,
-    download_url,
-  });
-
-  console.log("SENDING EMAIL TO:", email);
+  const year = String(new Date().getFullYear());
 
   await sendGridEmail({
     to: email,
     templateId: LOGBOOK_TEMPLATE_ID,
     dynamicTemplateData: {
       download_url: download_url,
-      year: new Date().getFullYear(),
+      year: year,
     },
   });
-
-  console.log("EMAIL SENT SUCCESSFULLY");
+  console.log("✅ EMAIL SENT");
 }
 
-/** Read-only: generations remaining. Consumption happens in POST /api/generateLogbook only. */
+/** Read-only: generations remaining. Consumption on download: POST consumeLogbookDownload. */
 exports.useLogbookToken = onRequest({
   region: "us-central1",
   cors: true,
@@ -267,6 +440,48 @@ exports.useLogbookToken = onRequest({
     return res.status(500).send("Token error");
   }
 });
+
+exports.getLogbookTokenStatus = onRequest(
+  {
+    region: "us-central1",
+    cors: true,
+    invoker: "public",
+  },
+  async (req, res) => {
+    try {
+      if (req.method === "OPTIONS") {
+        return res.status(204).send("");
+      }
+      const token = String(req.headers["x-logbook-token"] || "").trim();
+
+      if (!token) {
+        return res.status(400).json({ success: false, error: "Missing token" });
+      }
+
+      const doc = await admin
+        .firestore()
+        .collection("logbook_tokens")
+        .doc(token)
+        .get();
+
+      if (!doc.exists) {
+        return res.status(404).json({ success: false, error: "Token not found" });
+      }
+
+      const data = doc.data() || {};
+
+      return res.json({
+        success: true,
+        remaining: Number(data.remaining || 0),
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        error: err && err.message ? String(err.message) : "error",
+      });
+    }
+  }
+);
 
 exports.validateToken = onRequest({
   region: "us-central1",
@@ -331,6 +546,175 @@ exports.checkAndConsumeToken = onCall(
     });
 
     return { ok: true };
+  }
+);
+
+/**
+ * Admin-only: create a logbook access URL identical to the post-payment link.
+ * Writes `logbook_tokens/{token}` (consumed by existing validation) and mirrors
+ * metadata to `accessTokens/{token}` for admin records.
+ */
+exports.createManualAccessLink = onCall(
+  {
+    region: "us-central1",
+    cors: true,
+    invoker: "public",
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentication required.");
+    }
+    const claims = request.auth.token || {};
+    if (claims.admin !== true && claims.role !== "admin") {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const emailRaw = String(request.data?.email || "").trim();
+    const email = emailRaw.toLowerCase();
+    if (!email || !email.includes("@")) {
+      throw new HttpsError("invalid-argument", "Valid email required.");
+    }
+    const token = crypto.randomUUID();
+    const db = admin.firestore();
+    const logbookRef = db.collection("logbook_tokens").doc(token);
+    const accessRef = db.collection("accessTokens").doc(token);
+    const createdAt = FieldValue.serverTimestamp();
+    const batch = db.batch();
+    batch.set(logbookRef, {
+      remaining: 3,
+      uploadsRemaining: 3,
+      createdAt,
+      email,
+      source: "admin",
+    });
+    batch.set(accessRef, {
+      token,
+      email,
+      remainingUses: 3,
+      createdAt,
+      source: "admin",
+    });
+    await batch.commit();
+    const link = `https://autologbooksa.co.za/logbook.html?token=${encodeURIComponent(token)}`;
+    return { success: true, link };
+  }
+);
+
+const RESEND_ACCESS_SUBJECT = "Your Auto Logbook SA Access Link";
+
+function buildResendAccessEmailBodies(link) {
+  const text =
+    "Hello,\n\n" +
+    "You can access the Auto Logbook SA tool using the link below:\n\n" +
+    link +
+    "\n\n" +
+    "You have 3 logbook generations available.\n\n" +
+    "If you experience any issues, feel free to reply to this email.";
+  const href = encodeURI(String(link));
+  const label = String(link)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/"/g, "&quot;");
+  const html =
+    "<p>Hello,</p>" +
+    "<p>You can access the Auto Logbook SA tool using the link below:</p>" +
+    '<p><a href="' +
+    href.replace(/"/g, "%22") +
+    '">' +
+    label +
+    "</a></p>" +
+    "<p>You have 3 logbook generations available.</p>" +
+    "<p>If you experience any issues, feel free to reply to this email.</p>";
+  return { text, html };
+}
+
+/**
+ * Admin-only: reuse or create access token metadata, ensure logbook_tokens exists, email link to user.
+ */
+exports.resendAccessLink = onCall(
+  {
+    region: "us-central1",
+    cors: true,
+    invoker: "public",
+    secrets: [SENDGRID_API_KEY],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentication required.");
+    }
+    const claims = request.auth.token || {};
+    if (claims.admin !== true && claims.role !== "admin") {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const emailRaw = String(request.data?.email || "").trim();
+    const emailNormalized = emailRaw.toLowerCase();
+    if (!emailNormalized || !emailNormalized.includes("@")) {
+      throw new HttpsError("invalid-argument", "Valid email required.");
+    }
+    const db = admin.firestore();
+    const emailQueries = [emailNormalized];
+    if (emailRaw !== emailNormalized) {
+      emailQueries.push(emailRaw);
+    }
+
+    let tokenToUse = null;
+    outer: for (const em of emailQueries) {
+      const accessSnap = await db
+        .collection("accessTokens")
+        .where("email", "==", em)
+        .orderBy("createdAt", "desc")
+        .limit(10)
+        .get();
+      for (const doc of accessSnap.docs) {
+        const d = doc.data() || {};
+        const ru = Number(d.remainingUses);
+        if (!Number.isFinite(ru) || ru <= 0) {
+          continue;
+        }
+        const t = String(d.token || doc.id).trim();
+        if (!t) continue;
+        const lb = await db.collection("logbook_tokens").doc(t).get();
+        if (!lb.exists) continue;
+        const remaining = Number((lb.data() || {}).remaining ?? 0);
+        if (remaining > 0) {
+          tokenToUse = t;
+          break outer;
+        }
+      }
+    }
+
+    if (!tokenToUse) {
+      tokenToUse = crypto.randomUUID();
+      const createdAt = FieldValue.serverTimestamp();
+      const logbookRef = db.collection("logbook_tokens").doc(tokenToUse);
+      const accessRef = db.collection("accessTokens").doc(tokenToUse);
+      const batch = db.batch();
+      batch.set(logbookRef, {
+        remaining: 3,
+        uploadsRemaining: 3,
+        createdAt,
+        email: emailNormalized,
+        source: "admin-resend",
+      });
+      batch.set(accessRef, {
+        token: tokenToUse,
+        email: emailNormalized,
+        remainingUses: 3,
+        createdAt,
+        source: "admin-resend",
+      });
+      await batch.commit();
+    }
+
+    const link = `https://autologbooksa.co.za/logbook.html?token=${encodeURIComponent(tokenToUse)}`;
+    const { text, html } = buildResendAccessEmailBodies(link);
+    await sendGridEmail({
+      to: emailRaw,
+      subject: RESEND_ACCESS_SUBJECT,
+      text,
+      html,
+    });
+
+    return { success: true };
   }
 );
 
@@ -467,16 +851,19 @@ function warnDuplicateCanonicalsInBatch(routes) {
 async function getStoreFromCache(db, canonicalName) {
   if (!canonicalName) return null;
 
+  console.log("TRACE: CHECKING DB FOR", canonicalName);
   const doc = await db.collection("storeLocations").doc(canonicalName).get();
 
   if (!doc.exists) return null;
 
+  console.log("TRACE: DB HIT", canonicalName);
   return doc.data();
 }
 
 async function findSimilarStore(db, canonicalName) {
   if (!canonicalName) return null;
 
+  console.log("TRACE: CHECKING SIMILAR STORE", canonicalName);
   const prefix = canonicalName.split(" ")[0];
 
   const snapshot = await db
@@ -496,6 +883,7 @@ async function findSimilarStore(db, canonicalName) {
       existing.startsWith(target) ||
       target.startsWith(existing)
     ) {
+      console.log("TRACE: SIMILAR HIT", canonicalName);
       return { id: doc.id, data: doc.data() };
     }
   }
@@ -504,9 +892,29 @@ async function findSimilarStore(db, canonicalName) {
 }
 
 /** Shared resolver path used by resolveStores and processRoutelistUpload (writes storeLocations on success). */
+function failedStoreRow(route, cleaned, extra) {
+  return normalizeRouteCoordsDeep({
+    customer: route.customer,
+    canonicalName: cleaned || "",
+    address: "",
+    suburb: "",
+    city: "",
+    province: "",
+    lat: null,
+    lng: null,
+    createdAt: Date.now(),
+    failed: true,
+    ...(extra || {}),
+  });
+}
+
 async function runResolveStoresPipeline(route, db, API_KEY) {
   const raw = route.customer || "";
   const cleaned = cleanedCanonicalPreview(raw);
+  if (!cleaned) {
+    console.warn("runResolveStoresPipeline: empty cleaned canonical", { raw: raw.slice(0, 120) });
+    return failedStoreRow(route, "");
+  }
   const canonical = route.canonicalName || cleanedCanonicalPreview(route.customer || "");
   const cached = await getStoreFromCache(db, canonical);
 
@@ -549,10 +957,23 @@ async function runResolveStoresPipeline(route, db, API_KEY) {
 
   console.log("🔍 QUERY:", query);
 
+  console.log("TRACE: CALLING GOOGLE API", canonical);
   const url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=formatted_address,geometry,place_id&key=${API_KEY}`;
 
-  const response = await fetch(url);
-  const data = await response.json();
+  let data;
+  try {
+    const response = await fetch(url);
+    const text = await response.text();
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      console.error("findplacefromtext: invalid JSON", parseErr && parseErr.message, text && text.slice(0, 200));
+      return failedStoreRow(route, cleaned);
+    }
+  } catch (fetchErr) {
+    console.error("findplacefromtext fetch failed:", fetchErr && fetchErr.message);
+    return failedStoreRow(route, cleaned);
+  }
 
   let result;
 
@@ -563,8 +984,20 @@ async function runResolveStoresPipeline(route, db, API_KEY) {
 
     const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=address_components&key=${API_KEY}`;
 
-    const detailsRes = await fetch(detailsUrl);
-    const detailsData = await detailsRes.json();
+    let detailsData;
+    try {
+      const detailsRes = await fetch(detailsUrl);
+      const dtext = await detailsRes.text();
+      try {
+        detailsData = dtext ? JSON.parse(dtext) : {};
+      } catch (parseErr) {
+        console.error("placedetails: invalid JSON", parseErr && parseErr.message, dtext && dtext.slice(0, 200));
+        return failedStoreRow(route, cleaned);
+      }
+    } catch (fetchErr) {
+      console.error("placedetails fetch failed:", fetchErr && fetchErr.message);
+      return failedStoreRow(route, cleaned);
+    }
 
     console.log("🔥 DETAILS RESPONSE:", JSON.stringify(detailsData));
 
@@ -636,6 +1069,8 @@ async function runResolveStoresPipeline(route, db, API_KEY) {
       createdAt: Date.now()
     };
 
+    console.log("TRACE: GOOGLE RESULT USED", canonical);
+
     const existingQuery = await db
       .collection("storeLocations")
       .where("canonicalName", "==", result.canonicalName)
@@ -649,16 +1084,21 @@ async function runResolveStoresPipeline(route, db, API_KEY) {
       matchedName: matchedStore?.canonicalName || null
     });
 
-    if (!existingQuery.empty) {
-      const docId = existingQuery.docs[0].id;
+    try {
+      if (!existingQuery.empty) {
+        const docId = existingQuery.docs[0].id;
 
-      await db.collection("storeLocations").doc(docId).update(result);
+        await db.collection("storeLocations").doc(docId).update(result);
 
-      console.log("♻️ UPDATED EXISTING STORE:", result.canonicalName);
-    } else {
-      await db.collection("storeLocations").doc(result.canonicalName).set(result, { merge: true });
+        console.log("♻️ UPDATED EXISTING STORE:", result.canonicalName);
+      } else {
+        await db.collection("storeLocations").doc(result.canonicalName).set(result, { merge: true });
 
-      console.log("🆕 CREATED NEW STORE:", result.canonicalName);
+        console.log("🆕 CREATED NEW STORE:", result.canonicalName);
+      }
+    } catch (fireErr) {
+      console.error("storeLocations write failed:", fireErr && fireErr.message);
+      return failedStoreRow(route, cleaned);
     }
   } else {
     result = {
@@ -719,6 +1159,21 @@ exports.resolveStores = onRequest(
 );
 
 function mergeParserRouteWithStoreRow(route, storeRow) {
+  if (!storeRow || typeof storeRow !== "object") {
+    return {
+      ...route,
+      address: "",
+      suburb: "",
+      city: "",
+      province: "",
+      lat: null,
+      lng: null,
+      canonicalName: cleanedCanonicalPreview(route.customer || ""),
+      failed: true,
+      resolutionStatus: "needs_attention",
+      _resolved: false,
+    };
+  }
   const ll = normalizeLatLngPair(storeRow.lat, storeRow.lng);
   return {
     ...route,
@@ -792,6 +1247,78 @@ async function processRoutelistUploadInternal(routes, db, API_KEY) {
 
 exports.processRoutelistUploadInternal = processRoutelistUploadInternal;
 
+/** Parse JSON body when the runtime did not populate req.body (some proxies / raw handlers). */
+function httpJsonBody(req) {
+  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+  const raw = req.rawBody;
+  if (raw && Buffer.isBuffer(raw)) {
+    try {
+      const s = raw.toString("utf8");
+      return s ? JSON.parse(s) : {};
+    } catch (e) {
+      return null;
+    }
+  }
+  if (typeof req.body === "string" && req.body.length) {
+    try {
+      return JSON.parse(req.body);
+    } catch (e) {
+      return null;
+    }
+  }
+  return req.body || {};
+}
+
+exports.consumeLogbookDownload = onRequest(
+  {
+    region: "us-central1",
+    cors: true,
+    invoker: "public",
+  },
+  async (req, res) => {
+    try {
+      if (req.method === "OPTIONS") {
+        return res.status(204).send("");
+      }
+      if (req.method !== "POST") {
+        return res.status(405).json({ success: false, error: "Method not allowed" });
+      }
+      const parsed = httpJsonBody(req);
+      if (parsed === null) {
+        return res.status(400).json({ success: false, error: "Invalid JSON" });
+      }
+      req.body = parsed;
+
+      const isAdmin = await isAdminRequest(req);
+      const token = getLogbookAccessTokenFromRequest(req);
+      const requestId = req.headers["x-request-id"];
+
+      if (!isAdmin && !token) {
+        return res.status(403).json({ success: false, error: "Missing token" });
+      }
+
+      if (isAdmin) {
+        console.log("ADMIN BYPASS ACTIVE");
+      } else {
+        if (!requestId) {
+          return res.status(400).json({ success: false, error: "Missing request id" });
+        }
+
+        await consumeLogbookToken(token, requestId);
+      }
+
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(403).json({
+        success: false,
+        error: err && err.message ? String(err.message) : "Forbidden",
+      });
+    }
+  }
+);
+
 /** Excel / parser upload: DB lookup, resolve only missing stores, return full preview rows (order preserved). */
 exports.processRoutelistUpload = onRequest(
   { cors: true, region: "us-central1", invoker: "public" },
@@ -802,7 +1329,48 @@ exports.processRoutelistUpload = onRequest(
         return res.status(405).json({ error: "POST only" });
       }
 
-      const routes = req.body && req.body.routes;
+      const parsed = httpJsonBody(req);
+      if (parsed === null) {
+        return res.status(400).json({ error: "invalid_json" });
+      }
+      req.body = parsed;
+
+      const isAdmin = await isAdminRequest(req);
+
+      if (isAdmin) {
+        console.log("ADMIN BYPASS ACTIVE");
+      } else {
+        const tokenFromHeader = String(
+          req.headers["x-logbook-token"] ||
+            req.headers["X-Logbook-Token"] ||
+            ""
+        ).trim();
+        const tokenFromBody =
+          parsed &&
+          parsed.logbookAccessToken != null &&
+          String(parsed.logbookAccessToken).trim() !== ""
+            ? String(parsed.logbookAccessToken).trim()
+            : "";
+        const token = tokenFromHeader || tokenFromBody;
+
+        if (!token) {
+          return res.status(401).json({ error: "Missing token" });
+        }
+
+        const tokenDoc = await admin
+          .firestore()
+          .collection("logbook_tokens")
+          .doc(token)
+          .get();
+
+        if (!tokenDoc.exists) {
+          return res.status(401).json({ error: "Invalid token" });
+        }
+
+        console.log("UPLOAD ALLOWED — TOKEN VALID");
+      }
+
+      const routes = parsed && parsed.routes;
       const v = validateRoutesInput(routes);
       if (!v.ok) {
         return res.status(400).json(v.body);
@@ -825,6 +1393,7 @@ exports.processRoutelistUpload = onRequest(
         const route = routes[i];
         const cleaned = cleanedCanonicalPreview(route.customer || "");
 
+        console.log("TRACE: CHECKING DB FOR", cleaned);
         const existingQuery = await db
           .collection("storeLocations")
           .where("canonicalName", "==", cleaned)
@@ -839,6 +1408,7 @@ exports.processRoutelistUpload = onRequest(
 
         let storeRow;
         if (!existingQuery.empty) {
+          console.log("TRACE: DB HIT", cleaned);
           storeRow = existingQuery.docs[0].data();
         } else {
           storeRow = await runResolveStoresPipeline({ customer: route.customer }, db, API_KEY);
@@ -851,7 +1421,10 @@ exports.processRoutelistUpload = onRequest(
       return res.status(200).json({ routes: out });
     } catch (err) {
       console.error("processRoutelistUpload:", err);
-      return res.status(500).json({ error: "process_routelist_upload_failed" });
+      return res.status(500).json({
+        error: "process_routelist_upload_failed",
+        message: err && err.message ? String(err.message) : "unknown",
+      });
     }
   }
 );
@@ -861,6 +1434,24 @@ function computeRouteEditedPreview(r, original) {
   return ["address", "suburb", "city", "province"].some(
     (f) => String(r[f] ?? "").trim() !== String(o[f] ?? "").trim()
   );
+}
+
+/** Pre-edit address line from client (never replaced by geocoded formatted_address). */
+function pickOriginalAddressFromClientRoute(row) {
+  if (!row || typeof row !== "object") return "";
+  const trim = (v) =>
+    v != null && String(v).trim() !== "" ? String(v).trim() : "";
+  let s = trim(row.originalAddress);
+  if (s) return s;
+  s = trim(row.address_original);
+  if (s) return s;
+  s = trim(row.rawAddress);
+  if (s) return s;
+  if (row.original && typeof row.original === "object") {
+    s = trim(row.original.address);
+    if (s) return s;
+  }
+  return "";
 }
 
 function needsReprocessServer(route) {
@@ -1036,12 +1627,12 @@ exports.reprocessPreviewRoutes = onRequest(
         return res.status(405).json({ error: "POST only" });
       }
 
-      const API_KEY = process.env.GOOGLE_API_KEY;
-      if (!API_KEY) {
-        return res.status(500).json({ error: "missing_api_key" });
-      }
+      const API_KEY = process.env.GOOGLE_API_KEY || "";
 
-      const body = req.body || {};
+      const body = httpJsonBody(req);
+      if (body === null) {
+        return res.status(400).json({ error: "invalid_json" });
+      }
       const fullRoutes = body.routes;
       const v = validateRoutesInput(fullRoutes);
       if (!v.ok) {
@@ -1050,6 +1641,8 @@ exports.reprocessPreviewRoutes = onRequest(
       if (!fullRoutes.length) {
         return res.status(400).json({ error: "routes required" });
       }
+
+      console.log("🔥 BACKEND RECEIVED ROUTES:", fullRoutes);
 
       warnDuplicateCanonicalsInBatch(fullRoutes);
 
@@ -1060,7 +1653,7 @@ exports.reprocessPreviewRoutes = onRequest(
         const inputRow = fullRoutes[i];
         const base = { ...fullRoutes[i] };
         let updated;
-        if (needsReprocessServer(base)) {
+        if (API_KEY && needsReprocessServer(base)) {
           updated = await geocodePreviewRoute(base, API_KEY);
         } else {
           const k = cleanedCanonicalPreview(base.customer || "");
@@ -1071,19 +1664,42 @@ exports.reprocessPreviewRoutes = onRequest(
           updated = normalizeRouteCoordsDeep(base);
         }
 
-        const hasChanged =
-          inputRow.address !== updated.address ||
-          inputRow.city !== updated.city ||
-          inputRow.lat !== updated.lat ||
-          inputRow.lng !== updated.lng;
+        const editedLine =
+          inputRow.address != null ? String(inputRow.address).trim() : "";
+        const origLine = pickOriginalAddressFromClientRoute(inputRow);
+        const oSnap =
+          updated.original && typeof updated.original === "object"
+            ? updated.original
+            : {};
+        const originalAddressFinal =
+          origLine ||
+          (oSnap.address != null ? String(oSnap.address).trim() : "");
+        const currentAddr =
+          editedLine ||
+          (updated.address != null ? String(updated.address).trim() : "");
+        const addressForUi =
+          editedLine ||
+          (updated.address != null ? String(updated.address) : "");
 
-        if (hasChanged) {
-          merged.push({
-            ...updated,
-            original: inputRow,
-            status: "pending",
-          });
+        const outRow = {
+          ...inputRow,
+          ...updated,
+          status: "pending",
+          address: addressForUi,
+          originalAddress: originalAddressFinal,
+          currentAddress: currentAddr,
+        };
+        if (inputRow.addressEdited === true || inputRow.isEdited === true) {
+          if (inputRow.province !== undefined && inputRow.province !== null) {
+            outRow.province = String(inputRow.province).trim();
+          }
         }
+        console.log("🔥 BACKEND ROUTE:", {
+          originalAddress: originalAddressFinal,
+          currentAddress: currentAddr,
+          address: addressForUi,
+        });
+        merged.push(outRow);
       }
 
       const mergedOut = merged.map(normalizeRouteCoordsDeep);
@@ -1131,6 +1747,12 @@ exports.reprocessPreviewRoutes = onRequest(
 
       const processedRoutes = mergedOut;
 
+      console.log("🔥 PENDING SUBMISSION WRITE:", {
+        routes: processedRoutes,
+        status: "pending",
+        routeCount: processedRoutes.length
+      });
+
       await db.collection("logbookSubmissions").add({
         routes: processedRoutes,
         status: "pending",
@@ -1176,18 +1798,31 @@ exports.approveLogbookSubmission = onRequest(
 
       const routes = data.routes || [];
 
+      console.log(
+        "🔥 APPROVED FINAL WRITE:",
+        routes.filter((r) => r && r.status === "approved")
+      );
+
       for (const route of routes) {
         if (route.status !== "approved") continue;
         if (!route.canonicalName) continue;
 
         {
           const docRef = db.collection("storeLocations").doc(route.canonicalName);
+          const approvedAddr =
+            route.currentAddress != null &&
+            String(route.currentAddress).trim() !== ""
+              ? String(route.currentAddress).trim()
+              : route.address != null
+                ? String(route.address)
+                : "";
           await docRef.set(
             {
               canonicalName: route.canonicalName,
-              address: route.address,
+              address: approvedAddr,
               suburb: route.suburb,
               city: route.city,
+              province: route.province,
               lat: route.lat,
               lng: route.lng,
               updatedAt: FieldValue.serverTimestamp(),
@@ -1311,20 +1946,3 @@ exports.updateRouteStatus = onRequest(
   }
 );
 
-// TEMPORARY: remove after one-time role assignment is complete.
-exports.setAdminRole = onCall(async (req) => {
-  const allowedEmail = "granvillepowell@icloud.com";
-
-  if (!req.auth) {
-    throw new Error("Not authenticated");
-  }
-
-  if (req.auth.token.email !== allowedEmail) {
-    throw new Error("Not authorized");
-  }
-
-  const uid = req.auth.uid;
-  await admin.auth().setCustomUserClaims(uid, { admin: true });
-
-  return { success: true, message: "Admin role assigned" };
-});

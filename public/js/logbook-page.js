@@ -7,8 +7,11 @@
   console.log("STEP 1 — IIFE START");
   try {
 
-  /** Cloud Functions (emulator) base — same project as resolveStores / reprocessPreviewRoutes. */
-  var LOGBOOK_FUNCTIONS_BASE = 'http://127.0.0.1:5007/autologbook-sa/us-central1';
+  /** Cloud Functions base: emulator on localhost; production otherwise (same project as resolveStores / reprocessPreviewRoutes). */
+  var LOGBOOK_FUNCTIONS_BASE = (typeof window !== 'undefined' && window.location &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? 'http://127.0.0.1:5007/autologbook-sa/us-central1'
+    : 'https://us-central1-autologbook-sa.cloudfunctions.net';
   /** Express Cloud Function `api` — paths under /api/... */
   var LOGBOOK_API_FUNCTION_BASE = LOGBOOK_FUNCTIONS_BASE + '/api';
   function resolveLogbookExpressApiUrl(path) {
@@ -25,6 +28,36 @@
     isInIframe = true;
   }
 
+  var isAdminDashboardEmbed = false;
+  try {
+    isAdminDashboardEmbed = new URLSearchParams(window.location.search).get('adminEmbed') === '1';
+  } catch (e2) {
+    isAdminDashboardEmbed = false;
+  }
+
+  /** Admin embed only: same ID token as admin.js (parent window getAdminToken). */
+  function getAdminEmbedIdTokenAsPromise() {
+    if (!isAdminDashboardEmbed) {
+      return Promise.resolve(null);
+    }
+    try {
+      var p = window.parent;
+      if (p && p !== window && typeof p.getAdminToken === 'function') {
+        return p.getAdminToken().catch(function (err) {
+          console.error('FAILED TO GET ID TOKEN', err);
+          return null;
+        });
+      }
+    } catch (e) { /* cross-origin */ }
+    if (typeof window.getAdminToken === 'function') {
+      return window.getAdminToken().catch(function (err) {
+        console.error('FAILED TO GET ID TOKEN', err);
+        return null;
+      });
+    }
+    return Promise.resolve(null);
+  }
+
   var DEBUG_ROUTELIST = true;
 
   /** When true, final logbook runs in-browser (legacy). Default false = server is source of truth. Set before this script: window.DEBUG_LOCAL_ENGINE = true */
@@ -34,6 +67,14 @@
 
   if (window.DEBUG_LOCAL_ENGINE === true && window.logbookEngine && window.logbookEngine.runLogbookEngine) {
     window.logbookEngine.generate = window.logbookEngine.runLogbookEngine;
+  }
+
+  if (typeof window.selectedRegions === 'undefined' || !Array.isArray(window.selectedRegions)) {
+    window.selectedRegions = ['western_cape'];
+  }
+
+  if (typeof window.selectedCities === 'undefined' || !Array.isArray(window.selectedCities)) {
+    window.selectedCities = ['cape_town'];
   }
 
   var droppedRoutelistFile = null;
@@ -52,11 +93,12 @@
   var selectedManualDates = [];
   var leaveCalendarSelecting = false;
   var logbookService = window.logbookService;
-  /** Payment doc id from ?paymentId= — link is the access key. Null in admin iframe embed. */
-  var currentPayment = null;
-
   /** Authoritative access from POST /api/logbookAccessState (server only). */
   var logbookAccessState = { canGenerate: false, isAdmin: false, reason: null };
+  /** Paid flow: trimmed URL ?token=; used by fetchDownloadStatus + consume. */
+  var sessionToken = null;
+  /** True when URL token exists and server reports 0 downloads remaining (authoritative). */
+  var logbookGenerateBlockedByDownloads = false;
 
   function showLogbookAccessMessage(text) {
     var btn = document.getElementById('generateLogbookBtn');
@@ -90,12 +132,22 @@
         // Admin iframe must never be blocked by token gating.
         btn.disabled = false;
         btn.classList.remove('disabled');
+        btn.style.opacity = '';
+        btn.style.cursor = '';
       } else {
-        btn.disabled = !logbookAccessState.canGenerate;
-        if (logbookAccessState.canGenerate) {
+        var blockedByDownloads = logbookGenerateBlockedByDownloads === true;
+        btn.disabled = !logbookAccessState.canGenerate || blockedByDownloads;
+        if (logbookAccessState.canGenerate && !blockedByDownloads) {
           btn.classList.remove('disabled');
         } else {
           btn.classList.add('disabled');
+        }
+        if (blockedByDownloads) {
+          btn.style.opacity = '0.5';
+          btn.style.cursor = 'not-allowed';
+        } else {
+          btn.style.opacity = '';
+          btn.style.cursor = '';
         }
       }
     }
@@ -194,12 +246,22 @@
       } catch (e) {
         // ignore – admin email header is best-effort
       }
-      return Promise.resolve(iframeHeaders);
+      if (!isAdminDashboardEmbed) {
+        return Promise.resolve(iframeHeaders);
+      }
+      return getAdminEmbedIdTokenAsPromise().then(function (tok) {
+        if (tok) {
+          iframeHeaders['Authorization'] = 'Bearer ' + tok;
+        }
+        return iframeHeaders;
+      });
     }
 
     var headers = { 'Content-Type': 'application/json' };
-    if (currentPayment) {
-      headers['X-Logbook-Token'] = currentPayment;
+    var urlParamsHdr = new URLSearchParams(window.location.search);
+    var sessionTokenHdr = urlParamsHdr.get('token');
+    if (sessionTokenHdr != null && String(sessionTokenHdr).trim() !== '') {
+      headers['X-Logbook-Token'] = String(sessionTokenHdr).trim();
     }
     return getFirebaseAuthInitialReadyPromise().then(function () {
       try {
@@ -224,17 +286,122 @@
 
   async function checkAccess() {
     if (isInIframe) {
-      currentPayment = null;
       unlockPage();
       return;
     }
 
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    currentPayment = token ? String(token).trim() : "";
-    console.log("SESSION TOKEN:", token);
+    var urlParams = new URLSearchParams(window.location.search);
+    sessionToken = urlParams.get('token');
+    if (sessionToken != null) {
+      sessionToken = String(sessionToken).trim();
+    }
+    if (sessionToken === '') {
+      sessionToken = null;
+    }
+    console.log('SESSION TOKEN:', sessionToken);
     unlockPage();
     await refreshLogbookAccessState();
+    await fetchDownloadStatus();
+  }
+
+  function lockUI() {
+    var generateBtn = document.getElementById('generateLogbookBtn') || document.getElementById('generateBtn');
+    var downloadBtn = document.getElementById('downloadBtn');
+    if (generateBtn) {
+      generateBtn.disabled = true;
+      generateBtn.innerText = 'Locked';
+    }
+    if (downloadBtn) {
+      downloadBtn.disabled = true;
+    }
+  }
+
+  function updateDownloadsUI(value) {
+    var display = value;
+    if (display === null || display === undefined) {
+      display = '—';
+    }
+    var el = document.getElementById('downloadsLeft');
+    if (el) el.textContent = display;
+    var badge = document.getElementById('tokenBadge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'tokenBadge';
+      badge.style.position = 'fixed';
+      badge.style.top = '10px';
+      badge.style.right = '10px';
+      badge.style.background = '#000';
+      badge.style.color = '#fff';
+      badge.style.padding = '8px 12px';
+      badge.style.borderRadius = '8px';
+      badge.style.zIndex = '9999';
+      document.body.appendChild(badge);
+    }
+    badge.innerText = 'Downloads left: ' + display;
+
+    var n =
+      value !== null && value !== undefined && value !== '—'
+        ? Number(value)
+        : NaN;
+    logbookGenerateBlockedByDownloads = Number.isFinite(n) && n <= 0;
+
+    var btn = document.getElementById('generateLogbookBtn');
+    if (btn && !isInIframe) {
+      applyLogbookAccessToUi();
+    }
+  }
+
+  async function fetchDownloadStatus() {
+    try {
+      var urlParams = new URLSearchParams(window.location.search);
+      var tok = urlParams.get('token');
+      if (!tok || String(tok).trim() === '') {
+        updateDownloadsUI('—');
+        return null;
+      }
+      var res = await fetch(resolveLogbookExpressApiUrl('/api/getDownloadStatus'), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Logbook-Token': String(tok).trim()
+        }
+      });
+      var data = await res.json().catch(function () { return {}; });
+      var errStr = data.error != null ? String(data.error) : '';
+      if (
+        errStr.indexOf('No downloads remaining') !== -1 ||
+        errStr.indexOf('No tokens remaining') !== -1
+      ) {
+        updateDownloadsUI(0);
+        showTokenMessage('You have no downloads remaining');
+        lockUI();
+        return 0;
+      }
+      if (!res.ok) {
+        if (
+          errStr.indexOf('No tokens remaining') !== -1 ||
+          errStr.indexOf('No downloads remaining') !== -1
+        ) {
+          updateDownloadsUI(0);
+          showTokenMessage('You have no downloads remaining');
+          lockUI();
+          return 0;
+        }
+        updateDownloadsUI(0);
+        return 0;
+      }
+      var n = data.downloadsRemaining != null ? Number(data.downloadsRemaining) : 0;
+      if (!Number.isFinite(n)) n = 0;
+      updateDownloadsUI(n);
+      if (n <= 0) {
+        showTokenMessage('You have no downloads remaining');
+        lockUI();
+      }
+      return n;
+    } catch (e) {
+      console.error('fetchDownloadStatus:', e);
+      return null;
+    }
   }
 
   function showTokenMessage(message) {
@@ -265,7 +432,17 @@
       return;
     }
 
-    if (!currentPayment) {
+    var urlParamsDl = new URLSearchParams(window.location.search);
+    var sessionTokenDl = urlParamsDl.get('token');
+    if (!isInIframe && sessionTokenDl != null && String(sessionTokenDl).trim() !== '') {
+      var beforeLeft = await fetchDownloadStatus();
+      if (beforeLeft === 0) {
+        window.alert('No downloads remaining');
+        return;
+      }
+    }
+
+    if (sessionTokenDl == null || String(sessionTokenDl).trim() === '') {
       if (isInIframe) {
         exportLogbookToXlsx(data);
         return;
@@ -274,7 +451,42 @@
       return;
     }
 
-    exportLogbookToXlsx(data);
+    var exported = exportLogbookToXlsx(data);
+    if (!exported) {
+      return;
+    }
+
+    try {
+      var sessionToken = String(sessionTokenDl).trim();
+      var consumeUrl = LOGBOOK_FUNCTIONS_BASE + '/consumeLogbookDownload';
+      var consumeHeaders = {
+        'Content-Type': 'application/json',
+        'X-Logbook-Token': sessionToken,
+        'X-Request-Id': crypto.randomUUID()
+      };
+      if (isAdminDashboardEmbed) {
+        consumeHeaders['X-Admin-Dashboard'] = 'true';
+        var idTokenDl = await getAdminEmbedIdTokenAsPromise();
+        if (idTokenDl) {
+          consumeHeaders['Authorization'] = 'Bearer ' + idTokenDl;
+        }
+      }
+      var consumeRes = await fetch(consumeUrl, {
+        method: 'POST',
+        headers: consumeHeaders
+      });
+      var consumeData = await consumeRes.json().catch(function () { return {}; });
+      if (consumeData.success) {
+        await fetchDownloadStatus();
+      } else {
+        console.error('🔥 CONSUME FAILED:', consumeData.error);
+        await fetchDownloadStatus();
+      }
+    } catch (err) {
+      console.error('🔥 CONSUME ERROR:', err);
+      await fetchDownloadStatus();
+    }
+
     await refreshLogbookAccessState();
   }
 
@@ -598,8 +810,8 @@
         toCell,
         shopName,
         purposeCell,
-        openingKm,
-        closingKm,
+        (e.openingKm ?? openingKm),
+        (e.closingKm ?? closingKm),
         businessKm,
         businessKm
       ]);
@@ -950,9 +1162,13 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
     });
   }
 
-  /** Pass-through for consumers that expect fullAddress; same as route.address (no inference). */
+  /** Prefer user-facing line: currentAddress (post-edit) then address. */
   function fullAddressFromBackend(route) {
-    if (route == null || route.address == null) return '';
+    if (route == null) return '';
+    if (route.currentAddress != null && String(route.currentAddress).trim() !== '') {
+      return String(route.currentAddress);
+    }
+    if (route.address == null) return '';
     return String(route.address);
   }
 
@@ -980,7 +1196,12 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
   }
 
   function buildRouteVerifiedReadOnlyInnerHtml(routeObj) {
-    var addrVal = routeObj.address != null ? String(routeObj.address) : '';
+    var addrVal = '';
+    if (routeObj.currentAddress != null && String(routeObj.currentAddress).trim() !== '') {
+      addrVal = String(routeObj.currentAddress);
+    } else if (routeObj.address != null) {
+      addrVal = String(routeObj.address);
+    }
     var suburbVal = routeObj.suburb != null ? String(routeObj.suburb) : '';
     var cityVal = routeObj.city != null ? String(routeObj.city) : '';
     var provinceVal = routeObj.province != null ? String(routeObj.province) : '';
@@ -1054,6 +1275,527 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         var list = map[key];
         return { key: key, count: list.length, entries: list };
       });
+  }
+
+  /**
+   * Mirrors public/engine/parseRouteListExcel.js routeRowHasAnyWeekday — same shapes as parser + backend preview routes.
+   */
+  function routePreviewHasAnyWeekday(route) {
+    if (!route || typeof route !== 'object') return false;
+    if (route.days && typeof route.days === 'object') {
+      return !!(
+        route.days.mon ||
+        route.days.tue ||
+        route.days.wed ||
+        route.days.thu ||
+        route.days.fri ||
+        route.days.sat
+      );
+    }
+    if (route.mon || route.tue || route.wed || route.thu || route.fri || route.sat) return true;
+    if (route.day != null && String(route.day).trim() !== '') return true;
+    return false;
+  }
+
+  function detectInvalidRoutes(routes) {
+    if (!Array.isArray(routes)) return [];
+    if (window._routelistMode !== 'salesRep') return [];
+    var invalidWeekday = routes.filter(function (route) {
+      if (!route) return false;
+      if (route.mode === 'date') return false;
+      return !routePreviewHasAnyWeekday(route);
+    });
+    if (invalidWeekday.length && typeof console !== 'undefined' && console.log) {
+      console.log(
+        'TRACE INVALID ROUTES:',
+        invalidWeekday.map(function (r) {
+          return {
+            customer: r.customer,
+            _routeId: r._routeId,
+            rowIndex: r.rowIndex,
+            weeks: r.weeks,
+            days: r.days,
+            day: r.day
+          };
+        })
+      );
+    }
+    return invalidWeekday;
+  }
+
+  function detectMissingWeeks(routes) {
+    if (window._routelistMode !== 'salesRep') return [];
+
+    var missingWeek = (routes || []).filter(function (route) {
+      if (!route) return false;
+      if (route.mode === 'date') return false;
+
+      return Array.isArray(route.weeks) && route.weeks.length === 0;
+    });
+    if (missingWeek.length && typeof console !== 'undefined' && console.log) {
+      console.log(
+        'TRACE INVALID ROUTES:',
+        missingWeek.map(function (r) {
+          return {
+            customer: r.customer,
+            _routeId: r._routeId,
+            rowIndex: r.rowIndex,
+            weeks: r.weeks,
+            days: r.days,
+            day: r.day
+          };
+        })
+      );
+    }
+    if (typeof console !== 'undefined' && console.log) {
+      console.log(
+        'MISSING WEEK CHECK INPUT:',
+        (routes || []).map(function (r) {
+          return {
+            customer: r.customer,
+            weeks: r.weeks,
+            mode: r.mode,
+            _routeId: r._routeId
+          };
+        })
+      );
+      console.log(
+        'MISSING WEEK RESULT:',
+        (routes || [])
+          .filter(function (route) {
+            if (!route) return false;
+            if (route.mode === 'date') return false;
+            return Array.isArray(route.weeks) && route.weeks.length === 0;
+          })
+          .map(function (r) {
+            return {
+              customer: r.customer,
+              weeks: r.weeks,
+              _routeId: r._routeId
+            };
+          })
+      );
+    }
+    return missingWeek;
+  }
+
+  function detectCityMismatches(routes) {
+    if (window._routelistMode !== 'salesRep') return [];
+    if (!Array.isArray(routes)) return [];
+
+    var selected =
+      window.selectedCities && window.selectedCities.length
+        ? window.selectedCities
+        : ['cape_town'];
+
+    return routes.filter(function (r) {
+      if (!r) return false;
+
+      var city = String(r.city != null ? r.city : '').toLowerCase();
+      var province = String(r.province != null ? r.province : '').toLowerCase();
+
+      var isMatch = selected.some(function (sel) {
+
+        // 🔥 Cape Town = Western Cape
+        if (sel === 'cape_town') {
+          return province.includes('western cape');
+        }
+
+        // 🔥 Johannesburg = Gauteng
+        if (sel === 'johannesburg') {
+          return province.includes('gauteng');
+        }
+
+        // 🔥 Pretoria = Gauteng
+        if (sel === 'pretoria') {
+          return province.includes('gauteng');
+        }
+
+        // 🔥 Durban = KwaZulu-Natal
+        if (sel === 'durban') {
+          return province.includes('kwazulu-natal');
+        }
+
+        // 🔥 Port Elizabeth = Eastern Cape
+        if (sel === 'port_elizabeth') {
+          return province.includes('eastern cape');
+        }
+
+        // 🔥 East London = Eastern Cape
+        if (sel === 'east_london') {
+          return province.includes('eastern cape');
+        }
+
+        return false;
+      });
+
+      return !isMatch;
+    });
+  }
+
+  function detectRegionMismatches(routes) {
+    if (window._routelistMode !== 'salesRep') return [];
+    if (!Array.isArray(routes)) return [];
+    return routes.filter(function (r) {
+      return r && r._flag === 'wrong_region';
+    });
+  }
+
+  function renderInvalidRouteError(invalidRoutes, allRoutes) {
+    var container = document.getElementById('routesContainer');
+    if (!container) return;
+
+    var parent = container.parentNode;
+    if (parent) {
+      var oldBanners = parent.querySelectorAll('.invalid-route-error');
+      for (var ob = 0; ob < oldBanners.length; ob++) {
+        oldBanners[ob].remove();
+      }
+    }
+
+    var clearItems = container.querySelectorAll('.route-verified-item');
+    for (var ci = 0; ci < clearItems.length; ci++) {
+      clearItems[ci].classList.remove('duplicate-highlight');
+    }
+
+    if (!invalidRoutes || invalidRoutes.length === 0) return;
+
+    var banner = document.createElement('div');
+    banner.className = 'invalid-route-error';
+    banner.textContent =
+      'Some routes have no days selected. Please select at least one weekday for each route in your Excel file and upload again.';
+
+    // Same placement as renderDuplicateError: first child of #routelistPreview (above "Routes" heading).
+    parent.insertBefore(banner, parent.firstChild);
+
+    var list = Array.isArray(allRoutes) ? allRoutes : [];
+    var indices = invalidRoutes
+      .map(function (r) {
+        return list.indexOf(r);
+      })
+      .filter(function (i) {
+        return i >= 0;
+      });
+    invalidRoutes.forEach(function (r) {
+      var idx = list.indexOf(r);
+      var sel = '.route-verified-item[data-route-index="' + idx + '"]';
+      var el = idx >= 0 && container ? container.querySelector(sel) : null;
+      if (typeof console !== 'undefined' && console.log) {
+        console.log('TRACE HIGHLIGHT MATCH:', {
+          customer: r.customer,
+          _routeId: r._routeId,
+          rowIndex: r.rowIndex,
+          selector: sel,
+          found: !!el
+        });
+      }
+    });
+    highlightRoutesLikeDuplicates(indices);
+  }
+
+  function renderMissingWeekError(invalidRoutes, routes) {
+    var container = document.getElementById('routesContainer');
+    if (!container) return;
+
+    var parent = container.parentNode;
+    if (parent) {
+      var existing = parent.querySelectorAll('.missing-week-error');
+      for (var mw = 0; mw < existing.length; mw++) {
+        existing[mw].remove();
+      }
+    }
+
+    if (!invalidRoutes || !invalidRoutes.length) return;
+
+    var banner = document.createElement('div');
+    banner.className = 'missing-week-error duplicate-error';
+    banner.textContent =
+      'Some routes have no week selected. Please select at least one week for each route in your Excel file and upload again.';
+
+    parent.insertBefore(banner, parent.firstChild);
+
+    invalidRoutes.forEach(function (r) {
+      var container = document.getElementById('routesContainer');
+      if (!container) return;
+
+      var el = container.querySelector('.route-verified-item[data-route-id="' + r._routeId + '"]');
+      if (el) {
+        el.classList.add('duplicate-highlight');
+      }
+    });
+  }
+
+  function renderRegionMismatchError(invalidRoutes, routes) {
+    var container = document.getElementById('routesContainer');
+    if (!container) return;
+
+    var parent = container.parentNode;
+    if (parent) {
+      var existing = parent.querySelectorAll('.region-mismatch-error');
+      for (var rm = 0; rm < existing.length; rm++) {
+        existing[rm].remove();
+      }
+    }
+
+    if (!invalidRoutes || !invalidRoutes.length) return;
+
+    var banner = document.createElement('div');
+    banner.className = 'duplicate-error region-mismatch-error';
+    var n = invalidRoutes.length;
+    banner.innerHTML =
+      '⚠️ Location mismatch detected<br>' +
+      n +
+      ' store(s) appear outside your selected region';
+
+    parent.insertBefore(banner, parent.firstChild);
+
+    invalidRoutes.forEach(function (r) {
+      var c = document.getElementById('routesContainer');
+      if (!c) return;
+
+      var el = c.querySelector('.route-verified-item[data-route-id="' + String(r._routeId) + '"]');
+      if (el) {
+        el.classList.add('duplicate-highlight');
+      }
+    });
+  }
+
+  function renderCityMismatchError(invalidRoutes) {
+    var container = document.getElementById('routesContainer');
+    var parent = container ? container.parentNode : null;
+    if (!parent) return;
+
+    var existing = parent.querySelectorAll('.city-mismatch-error');
+    var ex;
+    for (ex = 0; ex < existing.length; ex++) {
+      existing[ex].remove();
+    }
+
+    if (!invalidRoutes || !invalidRoutes.length) return;
+
+    var banner = document.createElement('div');
+    banner.className = 'duplicate-error city-mismatch-error';
+    banner.innerHTML =
+      '\u26A0\uFE0F Location mismatch detected<br>' +
+      invalidRoutes.length +
+      ' store(s) appear outside your selected city/cities';
+
+    parent.insertBefore(banner, parent.firstChild);
+
+    invalidRoutes.forEach(function (r) {
+      if (!container) return;
+
+      var el = container.querySelector('.route-verified-item[data-route-id="' + String(r._routeId) + '"]');
+      if (el) el.classList.add('duplicate-highlight');
+    });
+  }
+
+  function showSuccessMessage(msg) {
+    var routes = window.currentRoutes || [];
+
+    var duplicates = detectDuplicateStores(routes);
+    var invalidDays = detectInvalidRoutes(routes);
+    var missingWeeks = detectMissingWeeks(routes);
+    var regionMismatches = detectRegionMismatches(routes);
+    var cityMismatches = detectCityMismatches(routes);
+
+    if (
+      (duplicates && duplicates.length) ||
+      (invalidDays && invalidDays.length) ||
+      (missingWeeks && missingWeeks.length) ||
+      (regionMismatches && regionMismatches.length) ||
+      (cityMismatches && cityMismatches.length)
+    ) {
+      console.log('🚫 BLOCKING SUCCESS MESSAGE — validation issues exist');
+      return;
+    }
+
+    var statusEl = document.getElementById('routeStatus');
+    if (!statusEl) return;
+
+    statusEl.innerHTML = '';
+
+    var div = document.createElement('div');
+    div.className = 'success-message';
+    div.textContent = msg;
+
+    statusEl.appendChild(div);
+  }
+
+  function updateRoutelistStatus(routes) {
+    var modeRs = window._routelistMode || (function () {
+      try {
+        var sm = localStorage.getItem('routelistMode');
+        if (sm === 'business' || sm === 'salesRep') return sm;
+      } catch (e) { /* ignore */ }
+      return 'salesRep';
+    })();
+    var duplicates = modeRs === 'salesRep' ? detectDuplicateStores(routes) : [];
+    var invalidDays = detectInvalidRoutes(routes);
+    var missingWeeks = detectMissingWeeks(routes);
+    var regionMismatches = detectRegionMismatches(routes);
+    var cityMismatches = detectCityMismatches(routes);
+
+    var statusEl = document.getElementById('routeStatus');
+    if (statusEl) {
+      var successNodes = statusEl.querySelectorAll('.success-message');
+      for (var sn = 0; sn < successNodes.length; sn++) {
+        successNodes[sn].remove();
+      }
+    }
+
+    var previewRoot = document.getElementById('routelistPreview');
+    var bannerScope = previewRoot || document;
+    var dupErrs = bannerScope.querySelectorAll('.duplicate-error');
+    for (var de = 0; de < dupErrs.length; de++) {
+      dupErrs[de].remove();
+    }
+    var invErrs = bannerScope.querySelectorAll('.invalid-route-error');
+    for (var ie = 0; ie < invErrs.length; ie++) {
+      invErrs[ie].remove();
+    }
+
+    if (duplicates && duplicates.length) {
+      renderDuplicateError(duplicates);
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+      }
+      return;
+    }
+
+    if (invalidDays && invalidDays.length) {
+      renderInvalidRouteError(invalidDays, routes);
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+      }
+      return;
+    }
+
+    if (missingWeeks && missingWeeks.length) {
+      renderMissingWeekError(missingWeeks, routes);
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+      }
+      return;
+    }
+
+    if (regionMismatches && regionMismatches.length) {
+      renderRegionMismatchError(regionMismatches, routes);
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+      }
+      return;
+    }
+
+    if (cityMismatches && cityMismatches.length) {
+      renderCityMismatchError(cityMismatches);
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+      }
+      return;
+    }
+
+    showSuccessMessage('All addresses processed successfully. You are ready to generate your logbook.');
+  }
+
+  function highlightRoutesLikeDuplicates(indices) {
+    var container = document.getElementById('routesContainer');
+    if (!container) return;
+    indices.forEach(function (idx) {
+      var el = container.querySelector('.route-verified-item[data-route-index="' + idx + '"]');
+      if (el) el.classList.add('duplicate-highlight');
+    });
+  }
+
+  function renderDuplicateError(duplicates) {
+    var container = document.querySelector('#routesContainer');
+    var routesSection = container && container.parentElement;
+    if (!routesSection) return;
+
+    var prevMsgs = routesSection.querySelectorAll('.duplicate-error');
+    for (var pi = 0; pi < prevMsgs.length; pi++) {
+      prevMsgs[pi].remove();
+    }
+    if (container) {
+      var inList = container.querySelectorAll('.duplicate-error');
+      for (var px = 0; px < inList.length; px++) {
+        inList[px].remove();
+      }
+    }
+
+    var prevItems = container ? container.querySelectorAll('.route-verified-item') : [];
+    for (var pj = 0; pj < prevItems.length; pj++) {
+      prevItems[pj].style.border = '';
+    }
+
+    if (!duplicates || duplicates.length === 0) return;
+
+    var message = document.createElement('div');
+    message.className = 'duplicate-error';
+    message.innerText = 'Duplicate stores found. Please remove duplicates from your Excel file and upload again.';
+
+    routesSection.insertBefore(message, routesSection.firstChild);
+
+    duplicates.forEach(function (dup) {
+      var entries = dup && dup.entries ? dup.entries : [];
+      if (entries.length > 0) {
+        entries.forEach(function (ent) {
+          var idx = ent.index;
+          var el = container.querySelector('.route-verified-item[data-route-index="' + idx + '"]');
+          if (el) el.style.border = '1px solid red';
+        });
+      } else {
+        var name = dup && dup.key != null ? dup.key : String(dup);
+        var items = container.querySelectorAll('.route-verified-item');
+        items.forEach(function (el) {
+          if (el.innerText.toLowerCase().indexOf(String(name).toLowerCase()) !== -1) {
+            el.style.border = '1px solid red';
+          }
+        });
+      }
+    });
+  }
+
+  function showRouteLoading() {
+    var container = document.querySelector('#routesContainer');
+    if (!container) return;
+    var previewEl = document.getElementById('routelistPreview');
+    var dupScope = previewEl || container.parentElement || container;
+    var dupes = dupScope.querySelectorAll('.duplicate-error');
+    for (var di = 0; di < dupes.length; di++) {
+      dupes[di].remove();
+    }
+    var inv = dupScope.querySelectorAll('.invalid-route-error');
+    for (var ii = 0; ii < inv.length; ii++) {
+      inv[ii].remove();
+    }
+    var content = document.getElementById('routelistPreviewContent');
+    if (!content) {
+      container.innerHTML =
+        '<div id="routelistPreviewContent" class="routelist-preview-content routes-scroll" aria-label="Routelist verification">' +
+        '<div class="routelist-loading">Processing your route list...</div></div>';
+    } else {
+      content.innerHTML = '<div class="routelist-loading">Processing your route list...</div>';
+    }
+    var wrap = document.getElementById('routelistPreview');
+    if (wrap) {
+      wrap.classList.remove('hidden');
+      wrap.style.display = '';
+    }
+  }
+
+  function hideRouteLoading() {
+    var content = document.getElementById('routelistPreviewContent');
+    if (!content) return;
+    var loading = content.querySelector('.routelist-loading');
+    if (loading) {
+      loading.remove();
+    }
   }
 
   /**
@@ -1204,11 +1946,14 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         if (mode === 'salesRep' && duplicates.length > 0) {
           console.error('[VALIDATION] Duplicate stores not allowed in salesRep mode', duplicates);
           window._hasSalesRepDuplicates = true;
-          /* top duplicate warning removed: warning only in Routes section */
+          renderDuplicateError(duplicates);
         } else if (mode === 'salesRep') {
           window._hasSalesRepDuplicates = false;
+          renderDuplicateError([]);
         }
-        /* business mode: do nothing with duplicates */
+        if (mode !== 'salesRep') {
+          renderDuplicateError([]);
+        }
 
         var previewWrap = document.getElementById('routelistPreview');
         if (previewWrap) previewWrap.classList.add('hidden');
@@ -1243,8 +1988,22 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
 
     console.log("🔥 RENDERING:", routes);
 
+    (routes || []).forEach(function (r, i) {
+      if (!r._routeId) {
+        r._routeId = 'route_' + i;
+      }
+    });
+
     const html = (routes || []).map(function (r, i) {
-      return '<div class="route-verified-item" data-route-index="' + i + '">' + buildRouteVerifiedReadOnlyInnerHtml(r) + '</div>';
+      if (typeof console !== 'undefined' && console.log) {
+        console.log('TRACE PREVIEW ROW:', {
+          customer: r.customer,
+          _routeId: r._routeId,
+          rowIndex: r.rowIndex,
+          previewIndex: i
+        });
+      }
+      return '<div class="route-verified-item" data-route-index="' + i + '" data-route-id="' + escapeAttrForPreview(String(r._routeId)) + '">' + buildRouteVerifiedReadOnlyInnerHtml(r) + '</div>';
     }).join('');
 
     content.innerHTML = html;
@@ -1259,7 +2018,33 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         window._hasSalesRepDuplicates = false;
       }
     }
+
+    console.log('PREVIEW ROUTE SAMPLE FOR INVALID-DAY CHECK:', routes && routes[0]);
+    var invalidSampleLog = detectInvalidRoutes(routes || []);
+    if (invalidSampleLog.length > 0) {
+      console.log('PREVIEW ROUTE SAMPLE MISSING WEEKDAY:', invalidSampleLog[0]);
+    }
+
     if (typeof window.validateLogbookForm === 'function') window.validateLogbookForm();
+
+    var modeDup = window._routelistMode;
+    var dupAfterRender = detectDuplicateStores(routes || []);
+    if (modeDup === 'salesRep' && dupAfterRender.length > 0) {
+      renderDuplicateError(dupAfterRender);
+    } else {
+      renderDuplicateError([]);
+    }
+    var invalidAfterRender =
+      modeDup === 'salesRep'
+        ? detectInvalidRoutes(routes || [])
+        : [];
+    renderInvalidRouteError(invalidAfterRender, routes || []);
+    var missingWeeks = detectMissingWeeks(routes || []);
+    renderMissingWeekError(missingWeeks, routes || []);
+    const mismatches = detectRegionMismatches(routes || []);
+    renderRegionMismatchError(mismatches, routes || []);
+    const cityMismatches = detectCityMismatches(routes || []);
+    renderCityMismatchError(cityMismatches);
   }
 
   function syncRouteStatusWarnHelper(routes) {
@@ -1289,9 +2074,7 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
       return 'salesRep';
     })();
     if (modeRs === 'salesRep' && detectDuplicateStores(routes).length > 0) {
-      /* top duplicate warning removed: warning only in Routes section */
-      statusEl.textContent = '';
-      statusEl.style.color = '';
+      updateRoutelistStatus(routes);
       syncRouteStatusWarnHelper(routes);
       return;
     }
@@ -1311,23 +2094,50 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
       statusEl.textContent = 'All addresses have been processed. Some locations need your attention. Please review them in the list below.';
       statusEl.style.color = '#b8860b';
     } else {
-      statusEl.textContent = 'All addresses processed successfully. You are ready to generate your logbook.';
-      statusEl.style.color = 'green';
+      updateRoutelistStatus(routes);
     }
     syncRouteStatusWarnHelper(routes);
   }
 
   async function finishWithProcessedRoutes(routes) {
     try {
-      const res = await fetch(LOGBOOK_FUNCTIONS_BASE + '/processRoutelistUpload', {
+      console.log('🔥 SAVE TRIGGERED');
+      showRouteLoading();
+      const sessionToken = new URLSearchParams(window.location.search).get('token')?.trim();
+      var processUrl = LOGBOOK_FUNCTIONS_BASE + '/processRoutelistUpload';
+      console.log('🔥 SAVE REQUEST URL:', processUrl);
+      console.log('🔥 SAVE REQUEST BODY:', { routes: routes });
+      var idToken = await getAdminEmbedIdTokenAsPromise();
+      const uploadHeaders = {
+        'Content-Type': 'application/json'
+      };
+      if (idToken) {
+        uploadHeaders['Authorization'] = 'Bearer ' + idToken;
+      }
+      if (isAdminDashboardEmbed) {
+        uploadHeaders['X-Admin-Dashboard'] = 'true';
+      }
+      if (sessionToken) {
+        uploadHeaders['X-Logbook-Token'] = sessionToken;
+      }
+      syncWorkingRegionSelection();
+      var uploadBody = { routes: routes, selectedRegions: window.selectedRegions.slice() };
+      if (sessionToken) {
+        uploadBody.logbookAccessToken = sessionToken;
+      }
+      const res = await fetch(processUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ routes: routes })
+        headers: uploadHeaders,
+        body: JSON.stringify(uploadBody)
       });
       const body = await res.json().catch(function () { return {}; });
+      console.log('🔥 SAVE RESPONSE:', body);
       console.log("🔥 BACKEND RESPONSE ROUTES:", body.routes);
       if (!res.ok) {
-        throw new Error((body && body.error) ? String(body.error) : ('HTTP ' + res.status));
+        var errParts = [];
+        if (body && body.error) errParts.push(String(body.error));
+        if (body && body.message) errParts.push(String(body.message));
+        throw new Error(errParts.length ? errParts.join(': ') : ('HTTP ' + res.status));
       }
       if (!body.routes || !Array.isArray(body.routes)) {
         throw new Error('Invalid processRoutelistUpload response');
@@ -1338,15 +2148,88 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
           window.currentRoutes[fj].fullAddress = fullAddressFromBackend(window.currentRoutes[fj]);
         }
       }
+      hideRouteLoading();
       renderRoutelistPreview(window.currentRoutes);
       updateRouteStatusFromRoutes(window.currentRoutes);
     } catch (err) {
+      console.error('🔥 SAVE ERROR:', err);
       console.error("🔥 RESOLVER ERROR:", err);
+      hideRouteLoading();
     }
   }
 
   function escapeAttrForPreview(s) {
     return (s != null ? String(s) : '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /**
+   * Apply reprocessPreviewRoutes response rows into window.currentRoutes by index, then refresh preview UI.
+   * Shared by per-row Save (single index) and Reprocess addresses (batch).
+   */
+  function mergeReprocessRoutesIntoPreview(editedIndices, responseRoutes) {
+    if (!responseRoutes || !Array.isArray(responseRoutes)) {
+      throw new Error('Invalid reprocess response');
+    }
+    if (responseRoutes.length !== editedIndices.length) {
+      throw new Error('Reprocess response count does not match edited routes');
+    }
+    var schedulePreserveKeys = [
+      'days',
+      'weeks',
+      'week',
+      'mode',
+      'mon',
+      'tue',
+      'wed',
+      'thu',
+      'fri',
+      'sat',
+      'day',
+      'startDate',
+      'endDate',
+      'frequency',
+      'rowIndex',
+      '_routeId'
+    ];
+    var mi;
+    for (mi = 0; mi < responseRoutes.length; mi++) {
+      var slot = editedIndices[mi];
+      var pr = responseRoutes[mi];
+      if (typeof slot !== 'number' || slot < 0 || !window.currentRoutes || slot >= window.currentRoutes.length) {
+        continue;
+      }
+      var existing = window.currentRoutes[slot];
+      if (!existing || !pr || typeof pr !== 'object') {
+        continue;
+      }
+      var mergedRow = Object.assign({}, existing, pr);
+      var sk;
+      for (sk = 0; sk < schedulePreserveKeys.length; sk++) {
+        var key = schedulePreserveKeys[sk];
+        if (existing[key] !== undefined) {
+          mergedRow[key] = existing[key];
+        }
+      }
+      if (existing.addressEdited === true || existing.isEdited === true) {
+        if (existing.province !== undefined && existing.province !== null) {
+          mergedRow.province = String(existing.province).trim();
+        }
+      }
+      window.currentRoutes[slot] = mergedRow;
+      if (window.currentRoutes[slot]) {
+        window.currentRoutes[slot].isEdited = false;
+        if (
+          window.currentRoutes[slot].currentAddress != null &&
+          String(window.currentRoutes[slot].currentAddress).trim() !== ''
+        ) {
+          window.currentRoutes[slot].address = window.currentRoutes[slot].currentAddress;
+        }
+        console.log('🔥 PREVIEW ROUTE:', window.currentRoutes[slot]);
+        window.currentRoutes[slot].fullAddress = fullAddressFromBackend(window.currentRoutes[slot]);
+      }
+    }
+    renderRoutelistPreview(window.currentRoutes);
+    updateRouteStatusFromRoutes(window.currentRoutes);
   }
 
   function initRoutelistPreviewEdit() {
@@ -1372,6 +2255,7 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
       } else if (field === 'suburb' || field === 'city' || field === 'province') {
         route.addressEdited = true;
       }
+      route.isEdited = true;
       route.fullAddress = fullAddressFromBackend(route);
       updateRouteStatusFromRoutes(window.currentRoutes);
       userHasEditedAddress = true;
@@ -1400,7 +2284,9 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
             currentlyEditing.classList.remove('route-verified-item-editing');
           }
         }
-        var addrVal = route.address != null ? String(route.address) : '';
+        var addrVal = (route.currentAddress != null && String(route.currentAddress).trim() !== '')
+          ? String(route.currentAddress)
+          : (route.address != null ? String(route.address) : '');
         var customerVal = (route.customer != null ? String(route.customer) : '');
         var suburbVal = (route.suburb != null ? String(route.suburb) : '');
         var cityVal = (route.city != null ? String(route.city) : '');
@@ -1421,6 +2307,7 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         item.classList.add('route-verified-item-editing');
       } else if (target.classList.contains('route-verified-save-btn')) {
         e.preventDefault();
+        console.log('🔥 SAVE TRIGGERED (preview row — reprocessPreviewRoutes for coordinates)');
         var form = item.querySelector('.route-verified-edit-form');
         if (!form) return;
         var prevCustomer = (route.customer != null ? String(route.customer) : '').trim();
@@ -1439,13 +2326,73 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         } else {
           route.addressEdited = true;
         }
+        route.isEdited = true;
         route.fullAddress = fullAddressFromBackend(route);
-        item.innerHTML = buildRouteVerifiedReadOnlyInnerHtml(route);
-        item.classList.remove('route-verified-item-editing');
         userHasEditedAddress = true;
         var reprocessBtn = document.getElementById('reprocess-addresses-btn');
         if (reprocessBtn) reprocessBtn.classList.remove('hidden');
-        updateRouteStatusFromRoutes(window.currentRoutes);
+
+        var saveIndex = index;
+        var saveBtnEl = target;
+        var statusSave = document.getElementById('routeStatus');
+        saveBtnEl.disabled = true;
+        var saveBtnOrigText = saveBtnEl.textContent;
+        saveBtnEl.textContent = 'Saving...';
+
+        syncWorkingRegionSelection();
+        var payloadSave = {
+          routes: [Object.assign({}, window.currentRoutes[saveIndex])],
+          selectedRegions: window.selectedRegions.slice()
+        };
+        var reprocessUrlSave = LOGBOOK_FUNCTIONS_BASE + '/reprocessPreviewRoutes';
+
+        fetch(reprocessUrlSave, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadSave)
+        })
+          .then(function (res) {
+            return res.json().catch(function () {
+              return {};
+            }).then(function (body) {
+              return { res: res, body: body };
+            });
+          })
+          .then(function (packed) {
+            var res = packed.res;
+            var body = packed.body;
+            if (!res.ok) {
+              throw new Error((body && body.error) ? String(body.error) : ('HTTP ' + res.status));
+            }
+            if (!body.routes || !Array.isArray(body.routes)) {
+              throw new Error('Invalid reprocess response');
+            }
+            mergeReprocessRoutesIntoPreview([saveIndex], body.routes);
+            if (statusSave) {
+              statusSave.textContent =
+                'Address saved and coordinates updated. Changes have been saved for admin review.';
+              statusSave.style.color = 'green';
+            }
+            console.log('🔥 EDITED ROUTES AFTER SAVE:', window.currentRoutes);
+          })
+          .catch(function (err) {
+            console.error('🔥 PREVIEW SAVE REPROCESS ERROR:', err);
+            if (statusSave) {
+              statusSave.textContent =
+                (err && err.message)
+                  ? err.message
+                  : 'Could not refresh coordinates. Try Reprocess addresses.';
+              statusSave.style.color = 'red';
+            }
+            item.innerHTML = buildRouteVerifiedReadOnlyInnerHtml(window.currentRoutes[saveIndex]);
+            item.classList.remove('route-verified-item-editing');
+          })
+          .finally(function () {
+            try {
+              saveBtnEl.disabled = false;
+              saveBtnEl.textContent = saveBtnOrigText;
+            } catch (fe) { /* node may be detached after full re-render */ }
+          });
       } else if (target.classList.contains('route-verified-cancel-btn')) {
         e.preventDefault();
         item.innerHTML = buildRouteVerifiedReadOnlyInnerHtml(route);
@@ -1478,6 +2425,10 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
       if (!route) continue;
       var prevCustomer = (route.customer != null ? String(route.customer) : '').trim();
       var copy = Object.assign({}, route);
+      if ((!copy.originalAddress || String(copy.originalAddress).trim() === '') &&
+          copy.original && copy.original.address != null) {
+        copy.originalAddress = String(copy.original.address).trim();
+      }
       var card = findRouteCardEl(content, i);
       if (card) {
         var form = card.querySelector('.route-verified-edit-form');
@@ -1502,10 +2453,12 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
   }
 
   function saveRouteChanges() {
+    console.log('🔥 SAVE TRIGGERED (collect from table — in-memory; use Reprocess for Firestore)');
     if (!window.currentRoutes) return;
     var routes = collectRoutesFromPreviewTable();
     window.currentRoutes = routes;
     console.log('[ROUTES] user edits saved:', routes.length);
+    console.log('🔥 EDITED ROUTES AFTER SAVE:', window.currentRoutes);
     updateRouteStatusFromRoutes(routes);
   }
 
@@ -1617,6 +2570,128 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
     });
   }
 
+  function updateCityLabel() {
+    var labels = {
+      cape_town: 'Cape Town',
+      johannesburg: 'Johannesburg',
+      pretoria: 'Pretoria',
+      durban: 'Durban',
+      port_elizabeth: 'Port Elizabeth',
+      east_london: 'East London'
+    };
+    var text = window.selectedCities
+      .map(function (c) {
+        return labels[c] || c;
+      })
+      .join(', ');
+    var labelSpan = document.getElementById('cityDropdownLabelText');
+    if (labelSpan) {
+      labelSpan.textContent = text;
+      return;
+    }
+    var trigger = document.getElementById('cityDropdownTrigger');
+    if (trigger && trigger.childNodes[0] && trigger.childNodes[0].nodeType === 3) {
+      trigger.childNodes[0].nodeValue = text + ' ';
+    }
+  }
+
+  function seedCityCheckboxesFromWindow() {
+    var menu = document.getElementById('cityDropdownMenu');
+    if (!menu) return;
+    var from = Array.isArray(window.selectedCities) ? window.selectedCities : [];
+    var allowed = {
+      cape_town: true,
+      johannesburg: true,
+      pretoria: true,
+      durban: true,
+      port_elizabeth: true,
+      east_london: true
+    };
+    var vals = [];
+    var vi;
+    for (vi = 0; vi < from.length; vi++) {
+      if (allowed[from[vi]]) vals.push(from[vi]);
+    }
+    if (!vals.length) vals = ['cape_town'];
+    window.selectedCities = vals.slice();
+    var cbs = menu.querySelectorAll('input[type="checkbox"]');
+    var j;
+    for (j = 0; j < cbs.length; j++) {
+      cbs[j].checked = vals.indexOf(cbs[j].value) !== -1;
+    }
+    updateCityLabel();
+  }
+
+  function syncWorkingRegionSelection() {
+    /* Working Region UI replaced by Working City; upload payload still uses window.selectedRegions default. */
+  }
+
+  function initWorkingCityDropdown() {
+    var dropdown = document.getElementById('cityDropdown');
+    var trigger = document.getElementById('cityDropdownTrigger');
+    var menu = document.getElementById('cityDropdownMenu');
+    if (!dropdown || !trigger || !menu) return;
+
+    seedCityCheckboxesFromWindow();
+
+    function setOpen(isOpen) {
+      if (isOpen) {
+        dropdown.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+      } else {
+        dropdown.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setOpen(!dropdown.classList.contains('open'));
+    });
+
+    trigger.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setOpen(!dropdown.classList.contains('open'));
+      }
+    });
+
+    menu.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+
+    var checkboxes = menu.querySelectorAll('input[type="checkbox"]');
+    var k;
+    for (k = 0; k < checkboxes.length; k++) {
+      checkboxes[k].addEventListener('change', function () {
+        if (!this.checked) {
+          var selectedCount = menu.querySelectorAll('input[type="checkbox"]:checked').length;
+          if (selectedCount === 0) {
+            this.checked = true;
+            return;
+          }
+        }
+        var selected = [];
+        var all = menu.querySelectorAll('input[type="checkbox"]');
+        var m;
+        for (m = 0; m < all.length; m++) {
+          if (all[m].checked) selected.push(all[m].value);
+        }
+        window.selectedCities = selected.length ? selected : ['cape_town'];
+        updateCityLabel();
+        if (window.currentRoutes && window.currentRoutes.length) {
+          renderRoutelistPreview(window.currentRoutes);
+        }
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!dropdown.contains(e.target)) {
+        setOpen(false);
+      }
+    });
+  }
+
   function initClearRoutelistButton() {
     var btn = document.getElementById('clear-routes-btn');
     if (!btn) return;
@@ -1647,18 +2722,86 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
     updateClearRoutelistButtonVisibility();
   }
 
+  function initNewLogbookButton() {
+    var btn = document.getElementById('btnNewLogbook');
+    var modal = document.getElementById('newLogbookModal');
+    var confirmBtn = document.getElementById('modalConfirm');
+    var cancelBtn = document.getElementById('modalCancel');
+    if (!btn || !modal || !confirmBtn || !cancelBtn) return;
+    btn.addEventListener('click', function () {
+      modal.classList.remove('hidden');
+    });
+    cancelBtn.addEventListener('click', function () {
+      modal.classList.add('hidden');
+    });
+    confirmBtn.addEventListener('click', function () {
+      modal.classList.add('hidden');
+      location.reload();
+    });
+  }
+
+  function initRefreshRoutesButton() {
+    var btn = document.getElementById('btnRefreshRoutes');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      console.log('🔄 Routes reset by user');
+      var fileInput = document.getElementById('routeFileInput');
+      if (fileInput) fileInput.value = '';
+      droppedRoutelistFile = null;
+      lastProcessedRoutelistFileId = null;
+      if (logbookService) logbookService.clearRoutes();
+      window.currentRoutes = null;
+      userHasEditedAddress = false;
+      window._hasSalesRepDuplicates = false;
+      var content = document.getElementById('routelistPreviewContent');
+      if (content) content.innerHTML = '';
+      var statusEl = document.getElementById('routeStatus');
+      if (statusEl) {
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+        statusEl.style.display = '';
+      }
+      var preview = document.getElementById('routelistPreview');
+      if (preview) {
+        preview.classList.add('hidden');
+        preview.classList.remove('closing');
+      }
+      var fn = document.getElementById('routelist-dropzone-filename');
+      if (fn) fn.textContent = '';
+      var dropzone = document.getElementById('routelist-dropzone');
+      if (dropzone) dropzone.classList.remove('invalid', 'drag-over');
+      updateClearRoutelistButtonVisibility();
+      updateStepProgress();
+      if (typeof window.validateLogbookForm === 'function') window.validateLogbookForm();
+    });
+  }
+
   function initReprocessAddressesButton() {
     var btn = document.getElementById('reprocess-addresses-btn');
     var status = document.getElementById('routeStatus');
     if (!btn) return;
     btn.addEventListener('click', async function () {
-      var updatedRoutes = collectRoutesFromPreviewTable();
-      if (!updatedRoutes || updatedRoutes.length === 0) {
+      console.log('🔥 SAVE TRIGGERED');
+      if (!window.currentRoutes || !window.currentRoutes.length) {
         if (status) { status.textContent = 'No routes to reprocess.'; status.style.color = 'red'; }
         return;
       }
-      window.currentRoutes = updatedRoutes;
+      saveRouteChanges();
+      var editedIndices = [];
+      var updatedRoutes = [];
+      for (var ei = 0; ei < window.currentRoutes.length; ei++) {
+        var er = window.currentRoutes[ei];
+        if (er && er.isEdited === true) {
+          editedIndices.push(ei);
+          updatedRoutes.push(Object.assign({}, er));
+        }
+      }
+      if (!updatedRoutes.length) {
+        window.alert('No changes to submit');
+        return;
+      }
       console.log('REGEN INPUT:', updatedRoutes);
+      console.log('🔥 REPROCESS PAYLOAD ROUTES (edited only):', updatedRoutes);
 
       var modeRe = (function () {
         if (window._routelistMode) return window._routelistMode;
@@ -1666,28 +2809,43 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         if (savedMode === 'business' || savedMode === 'salesRep') return savedMode;
         return 'salesRep';
       })();
-      var duplicatesRe = detectDuplicateStores(updatedRoutes);
+      var duplicatesRe = detectDuplicateStores(window.currentRoutes);
       if (modeRe === 'salesRep' && duplicatesRe.length > 0) {
         console.error('[VALIDATION] Duplicate stores not allowed in salesRep mode', duplicatesRe);
         window._hasSalesRepDuplicates = true;
+        renderDuplicateError(duplicatesRe);
       } else if (modeRe === 'salesRep') {
         window._hasSalesRepDuplicates = false;
+        renderDuplicateError([]);
+      }
+      if (modeRe !== 'salesRep') {
+        renderDuplicateError([]);
       }
 
+      syncWorkingRegionSelection();
       var payload = {
         routes: updatedRoutes.map(function (r) {
           return Object.assign({}, r);
-        })
+        }),
+        selectedRegions: window.selectedRegions.slice()
       };
 
+      var originalHtml = btn.innerHTML;
       btn.disabled = true;
+      btn.classList.add('loading');
+      btn.innerHTML = '\u23F3 Processing...';
+
       try {
-        var res = await fetch(LOGBOOK_FUNCTIONS_BASE + '/reprocessPreviewRoutes', {
+        var reprocessUrl = LOGBOOK_FUNCTIONS_BASE + '/reprocessPreviewRoutes';
+        console.log('🔥 SAVE REQUEST URL:', reprocessUrl);
+        console.log('🔥 SAVE REQUEST BODY:', payload);
+        var res = await fetch(reprocessUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         var body = await res.json().catch(function () { return {}; });
+        console.log('🔥 SAVE RESPONSE:', body);
         console.log("🔥 REPROCESS RESPONSE ROUTES:", body.routes);
         if (!res.ok) {
           throw new Error((body && body.error) ? String(body.error) : ('HTTP ' + res.status));
@@ -1695,19 +2853,16 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         if (!body.routes || !Array.isArray(body.routes)) {
           throw new Error('Invalid reprocess response');
         }
-        window.currentRoutes = body.routes;
-        for (var fi = 0; fi < window.currentRoutes.length; fi++) {
-          if (window.currentRoutes[fi]) {
-            window.currentRoutes[fi].fullAddress = fullAddressFromBackend(window.currentRoutes[fi]);
-          }
+        if (body.routes.length !== editedIndices.length) {
+          throw new Error('Reprocess response count does not match edited routes');
         }
-        renderRoutelistPreview(window.currentRoutes);
-        updateRouteStatusFromRoutes(window.currentRoutes);
+        mergeReprocessRoutesIntoPreview(editedIndices, body.routes);
         if (status) {
           status.textContent = 'Preview reprocessed. Updated routes are ready for logbook generation. Changes have been saved for admin review.';
           status.style.color = 'green';
         }
       } catch (err) {
+        console.error('🔥 SAVE ERROR:', err);
         console.error('reprocessPreviewRoutes:', err);
         if (status) {
           status.textContent = (err && err.message) ? err.message : 'Reprocess failed.';
@@ -1715,6 +2870,8 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         }
       } finally {
         btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.innerHTML = originalHtml;
       }
     });
   }
@@ -2584,7 +3741,9 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
         filled(registrationNumber) && filled(originAddress) && filled(openingKm) && filled(closingKm) &&
         filled(startDate) && filled(endDate) && filled(taxYear) && hasRoutes && allAddressesResolved &&
         previewHasCoords &&
-        confirmed && confirmedAddresses && !salesRepBlockedByDup;
+        confirmed &&
+        confirmedAddresses &&
+        !salesRepBlockedByDup;
 
       markFieldInvalid(firstName, !filled(firstName));
       markFieldInvalid(surname, !filled(surname));
@@ -2601,7 +3760,13 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
       markFieldInvalid(confirmAddressesCheckbox, !confirmedAddresses);
       var previewWrap = document.getElementById('routelistPreview');
       if (previewWrap) {
-        markFieldInvalid(previewWrap, !hasRoutes || salesRepBlockedByDup || !allAddressesResolved || !previewHasCoords);
+        markFieldInvalid(
+          previewWrap,
+          !hasRoutes ||
+            salesRepBlockedByDup ||
+            !allAddressesResolved ||
+            !previewHasCoords
+        );
       }
 
       return valid;
@@ -2617,10 +3782,12 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
 
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
-      validateForm();
 
       var routesForGen = collectRoutesFromPreviewTable();
       window.currentRoutes = routesForGen;
+      if (!validateForm()) {
+        return;
+      }
       if (!routesHaveLatLng(routesForGen)) {
         if (statusEl) {
           statusEl.textContent = 'Please reprocess the preview before generating the logbook.';
@@ -2803,18 +3970,13 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
           return;
         }
         function executeEngineRun() {
-          let normalizedMode = engineMode;
-          if (normalizedMode === 'salesRep') {
-            normalizedMode = 'cycle';
-          }
-          if (!['cycle', 'date'].includes(normalizedMode)) {
-            throw new Error('INVALID MODE SENT TO ENGINE: ' + normalizedMode);
-          }
-          console.log('🚨 MODE SENT TO ENGINE:', normalizedMode);
+          engineInput.mode = engineMode;
+          console.log('🚨 MODE SENT TO ENGINE:', engineMode);
 
-          const generateUrl = 'http://127.0.0.1:5007/autologbook-sa/us-central1/api/api/generateLogbook';
+          var generateUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? LOGBOOK_API_FUNCTION_BASE + '/generateLogbook'
+            : resolveLogbookExpressApiUrl('/api/generateLogbook');
           if (useLocalEngine) {
-            engineInput.mode = normalizedMode;
             var homeCoords = originAddress ? coordMap[originAddress] : null;
             if (homeCoords && homeCoords.lat != null && homeCoords.lng != null) {
               engineInput.homeLat = homeCoords.lat;
@@ -2861,45 +4023,62 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
             homeLng = Number(coordMap[hkSend].lng);
           }
           console.log("🚨 UI → API ROUTES:", JSON.stringify(parsedRoutes, null, 2));
-          return fetch(generateUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-admin': 'true'
-            },
-            body: JSON.stringify({
-              routes: parsedRoutes,
-              startDate: startDate,
-              endDate: endDate,
-              openingKm: openingKm,
-              homeAddress: originAddress,
-              homeLat: homeLat,
-              homeLng: homeLng,
-              currentWeek: currentWeek,
-              mode: normalizedMode,
-              leaveDays: leaveDaysArray || [],
-              manualEntries: manualEntriesArray || []
-            })
-          }).then(function (r) {
-            return r.text().then(function (text) {
-              var body = {};
-              try {
-                body = text ? JSON.parse(text) : {};
-              } catch (parseErr) {
-                body = {};
-              }
-              if (!r.ok) {
-                if (r.status === 403) {
-                  return refreshLogbookAccessState().then(function () {
-                    throw new Error((body && body.error) ? body.error : (text || ('HTTP ' + r.status)));
-                  });
+          var idTokenPromise = getAdminEmbedIdTokenAsPromise();
+          return idTokenPromise.then(function (idToken) {
+            var genHeaders = { 'Content-Type': 'application/json' };
+            if (idToken) {
+              genHeaders['Authorization'] = 'Bearer ' + idToken;
+            }
+            if (isAdminDashboardEmbed) {
+              genHeaders['X-Admin-Dashboard'] = 'true';
+            }
+            var urlParamsGen = new URLSearchParams(window.location.search);
+            var sessionToken = urlParamsGen.get('token');
+            sessionToken =
+              sessionToken != null && String(sessionToken).trim() !== ''
+                ? String(sessionToken).trim()
+                : '';
+            genHeaders['X-Logbook-Token'] = sessionToken;
+            genHeaders['X-Request-Id'] = crypto.randomUUID();
+            return fetch(generateUrl, {
+              method: 'POST',
+              headers: genHeaders,
+              body: JSON.stringify({
+                routes: parsedRoutes,
+                sessionToken: sessionToken,
+                logbookAccessToken: sessionToken,
+                startDate: startDate,
+                endDate: endDate,
+                openingKm: openingKm,
+                homeAddress: originAddress,
+                homeLat: homeLat,
+                homeLng: homeLng,
+                currentWeek: currentWeek,
+                mode: engineMode,
+                leaveDays: leaveDaysArray || [],
+                manualEntries: manualEntriesArray || []
+              })
+            }).then(function (r) {
+              return r.text().then(function (text) {
+                var body = {};
+                try {
+                  body = text ? JSON.parse(text) : {};
+                } catch (parseErr) {
+                  body = {};
                 }
-                throw new Error((body && body.error) ? body.error : (text || ('HTTP ' + r.status)));
-              }
-              if (!body.success || !body.data) {
-                throw new Error((body && body.error) ? body.error : 'Request failed');
-              }
-              return body.data;
+                if (!r.ok) {
+                  if (r.status === 403) {
+                    return refreshLogbookAccessState().then(function () {
+                      throw new Error((body && body.error) ? body.error : (text || ('HTTP ' + r.status)));
+                    });
+                  }
+                  throw new Error((body && body.error) ? body.error : (text || ('HTTP ' + r.status)));
+                }
+                if (!body.success || !body.data) {
+                  throw new Error((body && body.error) ? body.error : 'Request failed');
+                }
+                return body.data;
+              });
             });
           });
         }
@@ -3065,9 +4244,12 @@ if (isWeekendDay || isPublicHolidayDay || isZeroKmDay) {
     } catch (e) { /* ignore */ }
     updateClearRoutelistButtonVisibility();
     initClearRoutelistButton();
+    initNewLogbookButton();
     initReprocessAddressesButton();
     initTemplateDownload();
     initRoutelistDropzone();
+    initWorkingCityDropdown();
+    initRefreshRoutesButton();
     initRoutelistPreviewEdit();
     initParseButton();
     populateTaxYearSelect();

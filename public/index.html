@@ -19,7 +19,8 @@
   <meta name="twitter:description" content="Create your travel logbook in minutes. Upload your route list and generate a structured logbook ready for review and submission." />
   <meta name="twitter:image" content="https://autologbook-sa.web.app/assets/logos/logo.png" />
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="icon" type="image/x-icon" href="/assets/logos/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
   <style>
     #slotAdsFeatured {
       margin-bottom: 24px;
@@ -90,8 +91,14 @@
     }
 
     #recommended-tools-placement {
+      position: relative;
+      z-index: 10;
       padding-top: 40px;
       margin-top: 40px;
+    }
+
+    #recommended-tools-placement * {
+      pointer-events: auto;
     }
 
     .review-card {
@@ -141,12 +148,33 @@
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
     }
 
-    #recommended-tools-placement {
-      margin-top: 40px;
-    }
-
     html {
       scroll-behavior: smooth;
+    }
+
+    .home-article-teaser {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    .home-article-teaser-title {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+    .home-article-teaser-title a {
+      color: #0f766e;
+      text-decoration: none;
+    }
+    .home-article-teaser-title a:hover {
+      text-decoration: underline;
+    }
+    .home-article-teaser-excerpt {
+      font-size: 14px;
+      color: #475569;
+      margin: 0 0 14px;
+      line-height: 1.5;
     }
   </style>
 </head>
@@ -154,13 +182,27 @@
   <header class="site-header site-header-landing">
     <div class="container header-inner">
       <a href="index.html" class="brand"><img src="assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
-      <nav class="site-nav">
+      <button type="button" id="hamburgerBtn" class="hamburger-btn" aria-label="Open menu">☰</button>
+      <nav class="site-nav nav-links" aria-label="Main">
+        <a href="/resources.html">Articles</a>
         <a href="#how-it-works">How it Works</a>
         <a href="#templates">Templates</a>
         <a href="#generate-logbook-section">Start Generating Your Logbook</a>
+        <button type="button" id="installAppBtn" class="btn-approve hidden" style="margin-left:10px;">
+          Install App
+        </button>
       </nav>
     </div>
   </header>
+
+  <div id="installTip" style="
+    font-size:13px;
+    color:#555;
+    margin:10px 0;
+    text-align:center;
+  " class="hidden">
+    💡 Install this app for faster access
+  </div>
 
   <main class="landing-main">
     <section class="hero">
@@ -184,6 +226,39 @@
       </div>
     </section>
 
+<section class="video-section" style="padding: 80px 20px; text-align: center; margin-bottom: 60px;">
+
+  <p style="margin-bottom: 10px; font-size: 14px; opacity: 0.7;">
+    No spreadsheets. No manual tracking. Just results.
+  </p>
+
+  <h2 style="margin-bottom: 10px;">
+    See how it works
+  </h2>
+
+  <div style="max-width: 900px; margin: 0 auto;">
+
+    <video controls style="width: 100%; border-radius: 8px;">
+      <source src="assets/video/auto-logbook-demo.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+
+  </div>
+
+</section>
+
+    <section class="section landing-section" id="latest-articles" style="padding: 60px 20px;">
+      <div class="container">
+        <h2 style="text-align: center; margin-bottom: 8px;">Latest articles</h2>
+        <p style="text-align: center; color: var(--text-muted, #64748b); margin-bottom: 28px; font-size: 15px;">
+          Tips and guides from Auto Logbook SA
+        </p>
+        <div id="homeLatestArticles" class="home-latest-articles-wrap">
+          <div class="home-articles-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 1000px; margin: 0 auto;"></div>
+        </div>
+      </div>
+    </section>
+
     <section class="section section-grey landing-section problem-section" id="problem">
       <div class="container">
         <h2>Travel Logbooks Are Time-Consuming</h2>
@@ -201,7 +276,7 @@
             <ul class="problem-list">
               <li>Routes generated automatically</li>
               <li>Structured logbook created instantly</li>
-              <li>Ready for review and submission</li>
+              <li>Ready for review before submission</li>
             </ul>
           </div>
         </div>
@@ -242,7 +317,7 @@
           <h3 class="template-instruction-title">What Goes Into the Template</h3>
           <div class="template-instruction-body">
             <p class="template-instruction-text">List the locations you visit during your work week.</p>
-            <p class="template-instruction-text">The system calculates routes and formats your logbook automatically.</p>
+            <p class="template-instruction-text">The system calculates routes and formats your logbook for review.</p>
           </div>
         </div>
         <p class="template-instruction-text">Template downloads include a quick setup guide.</p>
@@ -276,15 +351,15 @@
           </div>
           <div class="feature-item">
             <h3>Structured Travel Logbook</h3>
-            <p>Trips are formatted into a clear, submission-ready logbook.</p>
+            <p>Trips are formatted into a clear, structured logbook ready for review.</p>
           </div>
           <div class="feature-item">
             <h3>Built for Travel Claims</h3>
-            <p>Designed to align with common SARS logbook requirements.</p>
+            <p>Designed to align with SARS logbook requirements.</p>
           </div>
           <div class="feature-item">
             <h3>Excel Export</h3>
-            <p>Download your logbook in a clean, ready-to-use format.</p>
+            <p>Download your logbook in a clean, editable format.</p>
           </div>
         </div>
       </div>
@@ -305,7 +380,7 @@
 
     <section id="recommended-tools-placement" class="section section-white landing-section recommended-tools-placement hidden">
       <div class="container">
-        <h2 class="section-title">Recommended Tools</h2>
+        <h2 class="section-title">Advertising</h2>
         <div id="slotAdsFeatured"></div>
         <div class="slots-grid ad-slots-three-grid">
           <div id="slotAdsSlot1" class="recommended-slot-column"></div>
@@ -394,10 +469,22 @@
             <input id="logbookQty" type="number" min="1" value="1" class="form-input" style="flex:0 0 80px; width:80px; max-width:80px; min-width:80px; padding:8px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
             <input id="couponCode" type="text" placeholder="Coupon code (optional)" class="form-input" style="flex:1 1 auto; width:auto; max-width:none; min-width:0; padding:8px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
           </div>
+          <div id="practitionerUsageInfo" style="font-size:13px; color:#555; margin-top:8px;" class="hidden"></div>
           <div class="premium-card-footer">Enter your email address</div>
           <input id="paymentEmail" type="email" placeholder="you@email.com" class="form-input" style="display:block; width:100%; max-width:none; min-width:0; padding:8px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
           <div id="checkoutTotal" class="premium-card-price">Total: R600</div>
           <button id="unlockLogbookBtn" class="btn btn-primary">Pay &amp; Generate Logbook</button>
+          <div class="practitioner-cta" style="margin-top: 20px; text-align: center;">
+            <p style="margin: 0; font-size: 14px;">
+              Are you a practitioner managing multiple clients?
+            </p>
+            <p style="margin: 5px 0 10px; font-size: 13px; color: #666;">
+              Apply for a practitioner code to unlock discounted pricing based on your volume.
+            </p>
+            <button type="button" id="openPractitionerModal" class="btn btn-secondary">
+              Apply for Practitioner Discount Code
+            </button>
+          </div>
           <p class="premium-card-footer">
             Your access link will be emailed to you after payment.
           </p>
@@ -409,7 +496,7 @@
     <section class="advertise-section">
       <div class="container">
         <div class="dashboard-card advertise-card">
-          <h3>Promote Your Tool to Auto Logbook SA Users</h3>
+          <h3>Advertise your Product to Auto Logbook SA Users</h3>
           <p>
             Reach drivers, contractors, and sales representatives preparing travel logbooks aligned with SARS requirements.
             Promote your product directly inside the tools section used by our users.
@@ -448,76 +535,116 @@
     </div>
   </div>
 
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-content">
-      <p>© Auto Logbook SA</p>
+  <div id="site-footer"></div>
+  <script>
+fetch('/partials/footer.html')
+  .then(r => r.text())
+  .then(html => {
+    document.getElementById('site-footer').innerHTML = html;
+  });
+</script>
 
-      <div class="footer-links">
-        <a href="#" id="openPrivacyFooter">Privacy</a>
-        <span class="footer-separator">•</span>
-        <a href="#" id="openTermsFooter">Terms</a>
-        <span class="footer-separator">•</span>
-        <a href="#" id="openRefundPolicyFooter">Refund Policy</a>
-        <span class="footer-separator">•</span>
-        <a href="#" id="openDisclaimerFooter">Disclaimer</a>
-        <span class="footer-separator">•</span>
-        <a href="mailto:support@autologbooksa.co.za">Contact</a>
+  <!-- Legal modals: Disclaimer, Terms, Privacy, Refund — HTML from components/legal-modals.html, bindings in js/legal-modals.js -->
+  <div id="legal-modals-root"></div>
+  <script src="js/legal-modals.js"></script>
+
+  <div id="practitionerModal" class="modal hidden">
+    <div class="modal-content">
+
+      <h2>Apply for Practitioner Discount Code</h2>
+
+      <p style="font-size: 14px; color: #666;">
+        Tell us how many logbooks you expect to generate per year.
+        We’ll assign pricing based on your expected volume.
+      </p>
+
+      <input id="practitionerName" type="text" placeholder="Full Name" class="form-input" style="display:block; width:100%; max-width:none; min-width:0; padding:8px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
+      <input id="practitionerEmail" type="email" placeholder="Email" class="form-input" style="display:block; width:100%; max-width:none; min-width:0; padding:8px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
+      <input id="practitionerBusiness" type="text" placeholder="Business Name" class="form-input" style="display:block; width:100%; max-width:none; min-width:0; padding:8px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;" />
+
+      <select id="practitionerVolume" class="form-input" style="display:block; width:100%; max-width:none; min-width:0; padding:8px; margin-bottom:10px; border:1px solid #e2e8f0; border-radius:8px; box-sizing:border-box; font-family:inherit; font-size:1rem;">
+        <option value="">Estimated number of logbooks per year</option>
+        <option value="50">Up to 50</option>
+        <option value="200">50 – 200</option>
+        <option value="1000">200 – 1000</option>
+        <option value="1000+">1000+</option>
+      </select>
+
+      <button type="button" id="submitPractitioner" class="btn btn-primary">
+        Request Practitioner Code
+      </button>
+
+      <div id="practitionerSuccess" class="success-message hidden">
+        Application submitted successfully. We will review and get back to you.
       </div>
 
-      <p class="engine">Powered by ClearTrack Logbook Engine</p>
-      <p class="footer-legal">Auto Logbook SA is an independent tool designed to assist with SARS travel logbook record-keeping. It is not affiliated with or endorsed by the South African Revenue Service (SARS). Users are responsible for reviewing and confirming the accuracy of their logbook before submission.</p>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Modals -->
-  <div class="modal-overlay" id="disclaimerModal" aria-hidden="true">
-    <div class="modal-box modal-content">
-      <h2>Important Disclaimer</h2>
-      <p>Auto Logbook SA provides software tools that assist users in generating vehicle travel logbooks based on information supplied by the user. The user remains solely responsible for ensuring that all information is accurate, complete, and compliant with SARS requirements. Auto Logbook SA does not guarantee acceptance of any logbook by the South African Revenue Service (SARS).</p>
-      <p>The software and information provided by Auto Logbook SA are intended for record-keeping purposes only and do not constitute tax, legal, or financial advice.</p>
-      <p>The user is responsible for ensuring that all trips, distances, dates, and travel purposes recorded in the logbook accurately reflect actual travel undertaken.</p>
-      <p>Distances and route calculations are generated using mapping services and may contain estimation errors. Users should review and confirm all generated information before relying on it for tax purposes.</p>
-      <p>Auto Logbook SA relies on information entered by the user as well as data provided by third-party services, including mapping and routing providers. The accuracy of generated logbooks depends on the completeness and correctness of the information supplied by the user and the availability of third-party services. Auto Logbook SA does not guarantee the accuracy, completeness, or suitability of generated distances, routes, or logbook entries. Users must review and verify all generated information before using it for tax or record-keeping purposes.</p>
-      <p>Auto Logbook SA is an independent software tool and is not affiliated with, endorsed by, or approved by the South African Revenue Service (SARS).</p>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-primary modal-close">I Understand</button>
-      </div>
     </div>
   </div>
-  <div class="modal-overlay" id="termsModal" aria-hidden="true">
-    <div class="modal-box modal-content">
-      <h2>Terms of Use</h2>
-      <p>By using Auto Logbook SA you agree to use the tool for personal or professional logbook generation only. You are responsible for the accuracy of data you enter and for compliance with SARS and local tax rules. This tool is provided as-is without warranty.</p>
-      <p>The software and information provided by Auto Logbook SA are intended for record-keeping purposes only and do not constitute tax, legal, or financial advice.</p>
-      <p>The user is responsible for ensuring that all trips, distances, dates, and travel purposes recorded in the logbook accurately reflect actual travel undertaken.</p>
-      <p>Auto Logbook SA is an independent software tool and is not affiliated with, endorsed by, or approved by the South African Revenue Service (SARS).</p>
-      <p>Distances and route calculations are generated using mapping services and may contain estimation errors. Users should review and confirm all generated information before relying on it for tax purposes.</p>
-      <p>Auto Logbook SA relies on information entered by the user as well as data provided by third-party services, including mapping and routing providers. The accuracy of generated logbooks depends on the completeness and correctness of the information supplied by the user and the availability of third-party services. Auto Logbook SA does not guarantee the accuracy, completeness, or suitability of generated distances, routes, or logbook entries. Users must review and verify all generated information before using it for tax or record-keeping purposes.</p>
-      <p>To the maximum extent permitted by law, Auto Logbook SA shall not be liable for any tax assessments, penalties, financial losses, or damages arising from the use of this software.</p>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-primary modal-close">Close</button>
-      </div>
-    </div>
-  </div>
-  <div class="modal-overlay" id="privacyModal" aria-hidden="true">
-    <div class="modal-box modal-content">
-      <h2>Privacy Policy</h2>
-      <p>Uploaded route lists are processed locally in your browser. No data is sent to any server or stored by us. Auto Logbook SA does not collect personal information.</p>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-primary modal-close">Close</button>
-      </div>
-    </div>
-  </div>
+
+  <script>
+    (function () {
+      var modal = document.getElementById('practitionerModal');
+      var openBtn = document.getElementById('openPractitionerModal');
+      var submitBtn = document.getElementById('submitPractitioner');
+      var successEl = document.getElementById('practitionerSuccess');
+      if (!modal || !openBtn || !submitBtn) return;
+
+      openBtn.onclick = function () {
+        if (successEl) successEl.classList.add('hidden');
+        modal.classList.remove('hidden');
+      };
+
+      modal.onclick = function (e) {
+        if (e.target === modal) {
+          modal.classList.add('hidden');
+        }
+      };
+
+      submitBtn.onclick = async function () {
+        var data = {
+          name: document.getElementById('practitionerName').value,
+          email: document.getElementById('practitionerEmail').value,
+          business: document.getElementById('practitionerBusiness').value,
+          volume: document.getElementById('practitionerVolume').value,
+        };
+
+        try {
+          var res = await fetch('/api/submitPractitionerApplication', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          var body = await res.json().catch(function () {
+            return {};
+          });
+          if (!res.ok) {
+            alert(body.error || 'Something went wrong. Please try again.');
+            return;
+          }
+          if (successEl) {
+            successEl.classList.remove('hidden');
+            setTimeout(function () {
+              successEl.classList.add('hidden');
+              modal.classList.add('hidden');
+            }, 2000);
+          }
+        } catch (e) {
+          alert('Something went wrong. Please try again.');
+        }
+      };
+    })();
+  </script>
 
   <script src="js/app.js"></script>
   <script type="module" src="js/reviews.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
   <script src="/firebase/init.js"></script>
   <script src="/js/firebase-init.js"></script>
+  <script src="/js/home-articles.js"></script>
   <script>
     (function () {
       var fallbackPrice = 699;
@@ -529,6 +656,7 @@
       var emailEl = document.getElementById('paymentEmail');
       var totalEl = document.getElementById('checkoutTotal');
       var unlockBtn = document.getElementById('unlockLogbookBtn');
+      var checkoutPricingSeq = 0;
 
       function setPriceText() {
         if (priceTextEl) priceTextEl.textContent = 'R' + Number(pricePerPack) + ' per logbook';
@@ -537,30 +665,132 @@
 
       async function updateCheckoutTotal() {
         if (!qtyEl || !totalEl) return Number(pricePerPack);
+        var seq = ++checkoutPricingSeq;
         var qty = Number(qtyEl.value) || 1;
         if (qty < 1) qty = 1;
         qty = Math.floor(qty);
 
-        var total = Number(pricePerPack) * qty;
-        var coupon = couponEl ? String(couponEl.value || '').trim().toUpperCase() : '';
-        if (coupon && window.db) {
+        var DEFAULT_PRICE = Number(pricePerPack);
+        if (!Number.isFinite(DEFAULT_PRICE) || DEFAULT_PRICE < 0) {
+          DEFAULT_PRICE = fallbackPrice;
+        }
+
+        var pricingResult = {
+          type: 'default',
+          pricePerLogbook: DEFAULT_PRICE
+        };
+
+        var couponInput = couponEl ? String(couponEl.value || '') : '';
+        var code = (couponInput || '').trim().toUpperCase();
+        var usageEl = document.getElementById('practitionerUsageInfo');
+        if (usageEl) {
+          usageEl.classList.add('hidden');
+          usageEl.textContent = '';
+        }
+
+        if (code) {
           try {
-            var doc = await window.db.collection('coupons').doc(coupon).get();
+            var couponApplied = false;
+            if (window.db) {
+              var doc = await window.db.collection('coupons').doc(code).get();
             if (doc.exists) {
               var data = doc.data() || {};
               if (data.active) {
-                if (data.type === 'percent') total = total * (1 - (Number(data.value) || 0) / 100);
-                else if (data.type === 'fixed') total = total - Number(data.value || 0);
+                  if (data.type === 'percent') {
+                    var pct = Number(data.value) || 0;
+                    var perAfterPct = DEFAULT_PRICE * (1 - pct / 100);
+                    if (Number.isFinite(perAfterPct) && perAfterPct >= 0) {
+                      pricingResult = {
+                        type: 'coupon',
+                        pricePerLogbook: perAfterPct
+                      };
+                      couponApplied = true;
+                    }
+                  } else if (data.type === 'fixed') {
+                    var fixedOff = Number(data.value) || 0;
+                    var subAfterFixed = DEFAULT_PRICE * qty - fixedOff;
+                    var perAfterFixed = qty > 0 ? subAfterFixed / qty : DEFAULT_PRICE;
+                    if (Number.isFinite(perAfterFixed) && perAfterFixed >= 0) {
+                      pricingResult = {
+                        type: 'coupon',
+                        pricePerLogbook: perAfterFixed
+                      };
+                      couponApplied = true;
+                    }
+                  }
+                }
+              }
+            }
+
+            if (!couponApplied) {
+              if (usageEl) {
+                usageEl.classList.add('hidden');
+                usageEl.textContent = '';
+              }
+              var detailsRes = await fetch(
+                '/api/getPractitionerCodeDetails?code=' + encodeURIComponent(code)
+              );
+              var details = await detailsRes.json().catch(function () {
+                return {};
+              });
+              if (usageEl && details.exists && details.active) {
+                if (details.remaining === 0) {
+                  usageEl.textContent =
+                    'This practitioner code has reached its limit';
+                  usageEl.classList.remove('hidden');
+                } else {
+                  var apiPrice = Number(details.price);
+                  if (Number.isFinite(apiPrice) && apiPrice >= 0) {
+                    pricingResult = {
+                      type: 'practitioner',
+                      pricePerLogbook: apiPrice
+                    };
+                  }
+                  if (
+                    details.remaining != null &&
+                    details.usageLimit != null
+                  ) {
+                    usageEl.textContent =
+                      'Logbooks remaining: ' +
+                      details.remaining +
+                      ' / ' +
+                      details.usageLimit;
+                  } else {
+                    usageEl.textContent =
+                      'Logbooks used: ' +
+                      (Number(details.usageCount) || 0) +
+                      ' (no cap)';
+                  }
+                  usageEl.classList.remove('hidden');
+                }
               }
             }
           } catch (e) {
             console.warn('Coupon lookup failed', e);
           }
         }
+
+        console.log('FINAL PRICE USED:', pricingResult);
+
+        var perLogbook = Number(pricingResult.pricePerLogbook);
+        if (!Number.isFinite(perLogbook) || perLogbook < 0) {
+          perLogbook = DEFAULT_PRICE;
+        }
+
+        var total = perLogbook * qty;
         if (total < 0) total = 0;
         total = Math.round(total * 100) / 100;
+        if (seq !== checkoutPricingSeq) {
+          return total;
+        }
         totalEl.textContent = 'Total: R' + Math.round(total);
         return total;
+      }
+
+      function runUpdateCheckoutTotal() {
+        return updateCheckoutTotal().catch(function (e) {
+          console.warn('updateCheckoutTotal failed', e);
+        });
       }
 
       async function loadFrontendPricing() {
@@ -596,10 +826,10 @@
         var t = root.querySelector('#checkoutTotal');
         var b = root.querySelector('#unlockLogbookBtn');
         if (!q || !c || !e || !t || !b) return;
-        q.addEventListener('input', updateCheckoutTotal);
-        q.addEventListener('change', updateCheckoutTotal);
-        c.addEventListener('input', updateCheckoutTotal);
-        c.addEventListener('change', updateCheckoutTotal);
+        q.addEventListener('input', runUpdateCheckoutTotal);
+        q.addEventListener('change', runUpdateCheckoutTotal);
+        c.addEventListener('input', runUpdateCheckoutTotal);
+        c.addEventListener('change', runUpdateCheckoutTotal);
         b.addEventListener('click', async function (evt) {
           evt.preventDefault();
           var qty = Number(q.value) || 1;
@@ -615,13 +845,13 @@
           } catch (_e) {}
           var coupon = String(c.value || '').trim().toUpperCase();
           var amount = await updateCheckoutTotal();
-          var paymentId = uniquePaymentId();
-          var tokens = qty * 3;
+          var pf_payment_id = uniquePaymentId();
+          var quantity = qty;
           var url = '/pay.html?product=logbook' +
             '&amount=' + encodeURIComponent(amount) +
-            '&custom_str1=' + encodeURIComponent(paymentId) +
+            '&custom_str1=' + encodeURIComponent(pf_payment_id) +
             '&email=' + encodeURIComponent(email) +
-            '&tokens=' + encodeURIComponent(tokens);
+            '&custom_str4=' + encodeURIComponent(quantity);
           if (coupon) url += '&coupon=' + encodeURIComponent(coupon);
           window.location.href = url;
         });
@@ -640,6 +870,9 @@
   </script>
   <script>
     (function () {
+      let adsListenerUnsub = null;
+      /** Last rendered display fingerprint per doc — skip DOM churn when only views/clicks/etc. change */
+      var adUiFingerprintById = {};
       var IS_DEV =
         location.hostname === 'localhost' ||
         location.hostname === '127.0.0.1';
@@ -755,6 +988,27 @@
         return '';
       }
 
+      function adUiFingerprint(data) {
+        var d = data || {};
+        var slot = displayCanonFromDoc(d);
+        var ip = d.imagePosition;
+        var posXRow = ip && ip.x != null ? Number(ip.x) : d.positionX;
+        var posYRow = ip && ip.y != null ? Number(ip.y) : d.positionY;
+        return JSON.stringify({
+          slot: slot,
+          toolName: d.toolName || d.title || '',
+          description: d.description ? String(d.description) : '',
+          logo: d.logo || '',
+          image: d.image || '',
+          website: d.website || '',
+          url: d.url || '',
+          companyName: d.companyName ? String(d.companyName) : '',
+          positionX: posXRow,
+          positionY: posYRow,
+          imagePosition: ip ? { x: ip.x, y: ip.y } : null
+        });
+      }
+
       function wireGridClicks(tools, root, db) {
         var cards = root.querySelectorAll('.ad-slot-card');
         for (var i = 0; i < tools.length; i++) {
@@ -764,9 +1018,8 @@
               var payload = payloadForSlotModal(tool);
               var safeWebsite = (typeof window.safeWebsiteUrl === 'function') ? window.safeWebsiteUrl(payload.website) : '';
               if (safeWebsite) {
-                db.collection('sponsoredTools').doc(tool.id).update({ clicks: firebase.firestore.FieldValue.increment(1) })
-                  .catch(function () {})
-                  .then(function () { window.open(safeWebsite, '_blank'); });
+                /* clicks increment disabled here — avoid onSnapshot feedback loops */
+                window.open(safeWebsite, '_blank');
                 return;
               }
               if (typeof window.openToolModal === 'function') window.openToolModal(payload);
@@ -775,11 +1028,156 @@
         }
       }
 
+      var PLACEHOLDER_FEATURED_HTML =
+        '<div class="ad-card placeholder"><p>advertise here</p></div>';
+      var PLACEHOLDER_SLOT_HTML =
+        '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
+
+      function rowFromDoc(id, data) {
+        var d = data || {};
+        var ip = d.imagePosition;
+        var posXRow = ip && ip.x != null ? Number(ip.x) : d.positionX;
+        var posYRow = ip && ip.y != null ? Number(ip.y) : d.positionY;
+        return {
+          id: id,
+          toolName: d.toolName || d.title,
+          description: d.description,
+          logo: d.logo,
+          image: d.image,
+          website: d.website,
+          url: d.url,
+          phone: d.phone,
+          whatsapp: d.whatsapp,
+          instagram: d.instagram,
+          facebook: d.facebook,
+          companyName: d.companyName,
+          positionX: posXRow,
+          positionY: posYRow,
+          imagePosition: ip || null
+        };
+      }
+
+      function createAdElement(id, data) {
+        var row = rowFromDoc(id, data);
+        var wrap = document.createElement('div');
+        wrap.innerHTML = renderSlotAd(row);
+        var el = wrap.firstElementChild;
+        el.setAttribute('data-ad-id', id);
+        return el;
+      }
+
+      function removeAdFromUI(id) {
+        var sid = String(id);
+        var nodes = document.querySelectorAll('[data-ad-id]');
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i].getAttribute('data-ad-id') === sid) {
+            nodes[i].remove();
+            break;
+          }
+        }
+      }
+
+      function wireSingleAdCard(tool, cardEl, db) {
+        cardEl.onclick = function () {
+          var payload = payloadForSlotModal(tool);
+          var safeWebsite = (typeof window.safeWebsiteUrl === 'function') ? window.safeWebsiteUrl(payload.website) : '';
+          if (safeWebsite) {
+            /* clicks increment disabled here — avoid onSnapshot feedback loops */
+            window.open(safeWebsite, '_blank');
+            return;
+          }
+          if (typeof window.openToolModal === 'function') window.openToolModal(payload);
+        };
+      }
+
+      function syncPlaceholdersAndSection() {
+        if (!featuredEl.querySelector('[data-ad-id]')) {
+          featuredEl.innerHTML = PLACEHOLDER_FEATURED_HTML;
+        }
+        if (!slot1El.querySelector('[data-ad-id]')) {
+          slot1El.innerHTML = PLACEHOLDER_SLOT_HTML;
+        }
+        if (!slot2El.querySelector('[data-ad-id]')) {
+          slot2El.innerHTML = PLACEHOLDER_SLOT_HTML;
+        }
+        if (!slot3El.querySelector('[data-ad-id]')) {
+          slot3El.innerHTML = PLACEHOLDER_SLOT_HTML;
+        }
+        var hasAny =
+          featuredEl.querySelector('[data-ad-id]') ||
+          slot1El.querySelector('[data-ad-id]') ||
+          slot2El.querySelector('[data-ad-id]') ||
+          slot3El.querySelector('[data-ad-id]');
+        if (hasAny) {
+          showSection();
+        } else {
+          hideSection();
+        }
+      }
+
+      function addAdToUI(id, data) {
+            var slot = displayCanonFromDoc(data);
+            if (!slot) return;
+        var row = rowFromDoc(id, data);
+        var el = createAdElement(id, data);
+        el.style.pointerEvents = 'auto';
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          console.log('🔥 CLICK WORKING:', data.toolName || data.title);
+
+          db.collection('sponsoredTools').doc(id).update({
+            clicks: firebase.firestore.FieldValue.increment(1)
+          }).catch(function () {});
+
+          var payload = payloadForSlotModal(row);
+          var safeWebsite =
+            typeof window.safeWebsiteUrl === 'function'
+              ? window.safeWebsiteUrl(payload.website)
+              : '';
+          if (safeWebsite) {
+            window.open(safeWebsite, '_blank');
+          } else if (typeof window.openToolModal === 'function') {
+            window.openToolModal(payload);
+          }
+        });
+        var target = null;
+        if (slot === 'featured') {
+          target = featuredEl;
+          var prev = target.querySelectorAll('[data-ad-id]');
+          for (var fi = 0; fi < prev.length; fi++) {
+            prev[fi].remove();
+          }
+          var phF = target.querySelector('.ad-card.placeholder');
+          if (phF) phF.remove();
+        } else if (slot === 'slot1') {
+          target = slot1El;
+        } else if (slot === 'slot2') {
+          target = slot2El;
+        } else if (slot === 'slot3') {
+          target = slot3El;
+        }
+        if (!target) return;
+        if (slot !== 'featured') {
+          var ph = target.querySelector('.ad-slot.empty');
+          if (ph) ph.remove();
+        }
+        target.appendChild(el);
+        db.collection('sponsoredTools').doc(row.id).update({
+          views: firebase.firestore.FieldValue.increment(1)
+        }).catch(function () {});
+        if (typeof window.wireAdImageBackgrounds === 'function') {
+          window.wireAdImageBackgrounds(target);
+        }
+      }
+
       if (!window.db) {
         console.warn('[ADS] window.db missing — cannot load sponsoredTools');
-        hideSection();
-        return;
-      }
+            hideSection();
+            return;
+          }
       var db = window.db;
 
       var adsQuery = IS_DEV
@@ -790,114 +1188,45 @@
         IS_DEV ? "where status in ['live','approved'] (DEV)" : "where status == 'live'"
       );
 
-      adsQuery
-        .get()
-        .then(function (snap) {
-          console.log('[ADS] RAW SNAPSHOT size:', snap.size);
-          console.log(
-            '[ADS] RAW SNAPSHOT:',
-            snap.docs.map(function (d) {
-              var x = d.data() || {};
-              return {
-                id: d.id,
-                status: x.status,
-                slot: x.slot,
-                toolName: x.toolName || x.title
-              };
-            })
-          );
-          var featuredAds = [];
-          var slot1Ads = [];
-          var slot2Ads = [];
-          var slot3Ads = [];
-          snap.forEach(function (doc) {
-            var data = doc.data() || {};
-            var slot = displayCanonFromDoc(data);
-            console.log('[ADS] AD FILTER CHECK:', {
-              id: doc.id,
-              status: data.status,
-              slot: data.slot,
-              canon: slot || '(no slot match — row skipped)'
-            });
-            if (!slot) return;
-            var ip = data.imagePosition;
-            var posXRow = ip && ip.x != null ? Number(ip.x) : data.positionX;
-            var posYRow = ip && ip.y != null ? Number(ip.y) : data.positionY;
-            var row = {
-              id: doc.id,
-              toolName: data.toolName || data.title,
-              description: data.description,
-              logo: data.logo,
-              image: data.image,
-              website: data.website,
-              url: data.url,
-              phone: data.phone,
-              whatsapp: data.whatsapp,
-              instagram: data.instagram,
-              facebook: data.facebook,
-              companyName: data.companyName,
-              positionX: posXRow,
-              positionY: posYRow,
-              imagePosition: ip || null
-            };
-            if (slot === 'featured') {
-              featuredAds.push(row);
-            } else if (slot === 'slot1') {
-              slot1Ads.push(row);
-            } else if (slot === 'slot2') slot2Ads.push(row);
-            else if (slot === 'slot3') slot3Ads.push(row);
+      if (adsListenerUnsub) {
+        console.log('⚠️ Removing existing ads listener');
+        adsListenerUnsub();
+      }
+
+      adsListenerUnsub = adsQuery.onSnapshot(function (snap) {
+          console.log('🔥 REALTIME ADS UPDATE:', snap.size);
+          snap.docChanges().forEach(function (change) {
+            var doc = change.doc;
+            var data = doc.data();
+            var id = doc.id;
+            console.log('⚡ CHANGE TYPE:', change.type, id);
+            if (change.type === 'added') {
+              if (!displayCanonFromDoc(data)) return;
+              adUiFingerprintById[id] = adUiFingerprint(data);
+              addAdToUI(id, data);
+            }
+            if (change.type === 'modified') {
+              var fp = adUiFingerprint(data);
+              if (adUiFingerprintById[id] === fp) {
+                return;
+              }
+              if (!displayCanonFromDoc(data)) {
+                delete adUiFingerprintById[id];
+                removeAdFromUI(id);
+                return;
+              }
+              adUiFingerprintById[id] = fp;
+              removeAdFromUI(id);
+              addAdToUI(id, data);
+            }
+            if (change.type === 'removed') {
+              delete adUiFingerprintById[id];
+              removeAdFromUI(id);
+            }
           });
-          console.log('[ADS] ADS ARRAY LENGTHS:', {
-            featured: featuredAds.length,
-            slot1: slot1Ads.length,
-            slot2: slot2Ads.length,
-            slot3: slot3Ads.length
-          });
-          if (
-            featuredAds.length === 0 &&
-            slot1Ads.length === 0 &&
-            slot2Ads.length === 0 &&
-            slot3Ads.length === 0
-          ) {
-            console.warn('[ADS] No rows in any slot after slot mapping — hiding section');
-            hideSection();
-            return;
-          }
-          if (featuredAds.length > 0) {
-            featuredEl.innerHTML = renderSlotAd(featuredAds[0]);
-          } else {
-            featuredEl.innerHTML =
-              '<div class="ad-card placeholder"><p>advertise here</p></div>';
-          }
-          slot1El.innerHTML = slot1Ads.length ? slot1Ads.map(renderSlotAd).join('') : '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
-          slot2El.innerHTML = slot2Ads.length ? slot2Ads.map(renderSlotAd).join('') : '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
-          slot3El.innerHTML = slot3Ads.length ? slot3Ads.map(renderSlotAd).join('') : '<div class="slot-card ad-slot empty"><img src="assets/logos/logo.png" class="ad-slot-bg-logo" alt="" /><a href="/advertise.html" class="ad-slot-advertise-link">advertise here</a></div>';
-          if (typeof window.wireAdImageBackgrounds === 'function') {
-            window.wireAdImageBackgrounds(featuredEl);
-            window.wireAdImageBackgrounds(slot1El);
-            window.wireAdImageBackgrounds(slot2El);
-            window.wireAdImageBackgrounds(slot3El);
-          }
-          if (featuredAds.length > 0) {
-            wireGridClicks([featuredAds[0]], featuredEl, db);
-            db.collection('sponsoredTools').doc(featuredAds[0].id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
-          }
-          wireGridClicks(slot1Ads, slot1El, db);
-          wireGridClicks(slot2Ads, slot2El, db);
-          wireGridClicks(slot3Ads, slot3El, db);
-          slot1Ads.forEach(function (t) {
-            db.collection('sponsoredTools').doc(t.id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
-          });
-          slot2Ads.forEach(function (t) {
-            db.collection('sponsoredTools').doc(t.id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
-          });
-          slot3Ads.forEach(function (t) {
-            db.collection('sponsoredTools').doc(t.id).update({ views: firebase.firestore.FieldValue.increment(1) }).catch(function () {});
-          });
-          showSection();
-          console.log('[ADS] Recommended Tools section shown');
-        })
-        .catch(function (err) {
+          syncPlaceholdersAndSection();
+          console.log('[ADS] Recommended Tools section sync (docChanges)');
+        }, function (err) {
           console.error('[ADS] sponsoredTools query failed:', err);
           hideSection();
         });
@@ -1054,6 +1383,49 @@
         });
       });
     });
+  </script>
+  <script>
+    (function () {
+      var deferredPrompt = null;
+      var installBtn = document.getElementById('installAppBtn');
+      var installTip = document.getElementById('installTip');
+      if (!installBtn || !installTip) return;
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.classList.remove('hidden');
+        installTip.classList.remove('hidden');
+      });
+
+      installBtn.addEventListener('click', async function () {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        var choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          console.log('APP INSTALLED');
+        }
+        deferredPrompt = null;
+        installBtn.classList.add('hidden');
+        installTip.classList.add('hidden');
+      });
+
+      window.addEventListener('appinstalled', function () {
+        console.log('PWA INSTALLED');
+        installBtn.classList.add('hidden');
+        installTip.classList.add('hidden');
+      });
+    })();
+  </script>
+  <script>
+const hamburger = document.getElementById('hamburgerBtn');
+const nav = document.querySelector('.nav-links');
+
+if (hamburger && nav) {
+  hamburger.addEventListener('click', () => {
+    nav.classList.toggle('active');
+  });
+}
   </script>
 </body>
 </html>

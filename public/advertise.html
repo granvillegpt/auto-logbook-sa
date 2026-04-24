@@ -6,7 +6,8 @@
   <title>Promote your tool – Auto Logbook SA</title>
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/logbook-page.css" />
-  <link rel="icon" type="image/x-icon" href="/assets/logos/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
   <style>
     .ad-image-bg {
       pointer-events: none;
@@ -56,7 +57,8 @@
   <header class="site-header site-header-landing">
     <div class="container header-inner">
       <a href="index.html" class="brand"><img src="assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
-      <nav class="site-nav">
+      <button type="button" id="hamburgerBtn" class="hamburger-btn" aria-label="Open menu">☰</button>
+      <nav class="site-nav nav-links" aria-label="Main">
         <a href="index.html">Home</a>
         <a href="index.html#how-it-works">How it Works</a>
         <a href="index.html#templates">Templates</a>
@@ -184,18 +186,17 @@
     </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-content">
-        <p>© Auto Logbook SA</p>
-        <div class="footer-links">
-          <a href="index.html">Home</a>
-          <span class="footer-separator">•</span>
-          <a href="mailto:support@autologbooksa.co.za">Contact</a>
-        </div>
-      </div>
-    </div>
-  </footer>
+  <div id="site-footer"></div>
+  <script>
+fetch('/partials/footer.html')
+  .then(r => r.text())
+  .then(html => {
+    document.getElementById('site-footer').innerHTML = html;
+  });
+</script>
+
+  <div id="legal-modals-root"></div>
+  <script src="js/legal-modals.js"></script>
 
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -203,5 +204,15 @@
   <script src="/firebase/init.js"></script>
   <script src="/js/ad-booking-shared.js"></script>
   <script src="/js/advertise.js"></script>
+  <script>
+const hamburger = document.getElementById('hamburgerBtn');
+const nav = document.querySelector('.nav-links');
+
+if (hamburger && nav) {
+  hamburger.addEventListener('click', () => {
+    nav.classList.toggle('active');
+  });
+}
+</script>
 </body>
 </html>

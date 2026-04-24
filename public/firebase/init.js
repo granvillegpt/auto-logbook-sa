@@ -19,14 +19,23 @@ try {
       firebase.initializeApp(window.FIREBASE_CONFIG);
     }
 
+    window.firebaseFunctions =
+      typeof firebase.functions === "function"
+        ? firebase.functions()
+        : null;
+
     window.firebaseApp = firebase.app();
     window.db = typeof firebase.firestore === "function" ? firebase.firestore() : null;
-    if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    if (
+      location.hostname === "localhost" ||
+      location.hostname === "127.0.0.1"
+    ) {
       console.log("🔥 CONNECTING TO FIRESTORE EMULATOR");
       if (window.db) {
         window.db.useEmulator("127.0.0.1", 8086);
-        console.log("🔥 FRONTEND FIRESTORE PORT: 8086");
       }
+    } else {
+      console.log("🚀 USING PRODUCTION FIRESTORE");
     }
     window.storage = typeof firebase.storage === "function" ? firebase.storage() : null;
 

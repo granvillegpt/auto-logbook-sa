@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Articles – Auto Logbook SA</title>
+  <meta name="description" content="Guides and articles from Auto Logbook SA." />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="icon" href="/assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <style>
+    body.landing-page {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .resources-page-main { padding: 48px 20px 80px; max-width: 900px; margin: 0 auto; flex: 1; width: 100%; }
+    .resources-page-main h1 { margin-bottom: 8px; color: #0f172a; }
+    .resources-intro { color: var(--text-muted, #64748b); margin-bottom: 32px; }
+    .resources-loading, .resources-error { color: var(--text-muted); }
+    .resources-article-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 28px; }
+    .resources-article-card {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 20px;
+      align-items: start;
+      padding: 20px;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    @media (max-width: 640px) {
+      .resources-article-card { grid-template-columns: 1fr; }
+    }
+    .resources-article-thumb-wrap { display: block; border-radius: 8px; overflow: hidden; background: #f1f5f9; }
+    .resources-article-thumb { width: 100%; height: 100px; object-fit: cover; display: block; }
+    .resources-article-title { margin: 0 0 8px; font-size: 1.25rem; }
+    .resources-article-title a { color: #0f766e; text-decoration: none; }
+    .resources-article-title a:hover { text-decoration: underline; }
+    .resources-article-date { font-size: 13px; color: #64748b; margin: 0 0 8px; }
+    .resources-article-excerpt { margin: 0 0 12px; line-height: 1.5; color: #334155; font-size: 15px; }
+    .resources-read-more { display: inline-block; }
+    #resourcesEmpty { display: none; color: var(--text-muted); }
+  </style>
+</head>
+<body class="landing-page">
+  <header class="site-header site-header-landing">
+    <div class="container header-inner">
+      <a href="/index.html" class="brand"><img src="/assets/logos/auto_logbook_logo-white.png" alt="Auto Logbook SA" class="site-logo"></a>
+      <button type="button" id="hamburgerBtn" class="hamburger-btn" aria-label="Open menu">☰</button>
+      <nav class="site-nav nav-links" aria-label="Main">
+        <a href="/index.html">Home</a>
+        <a href="/resources.html">Articles</a>
+        <a href="/index.html#how-it-works">How it Works</a>
+        <a href="/index.html#templates">Templates</a>
+      </nav>
+    </div>
+  </header>
+  <main class="resources-page-main">
+    <h1>Articles</h1>
+    <p class="resources-intro">Articles and guides for travel logbooks and SARS-aligned workflows.</p>
+    <div id="resourcesEmpty">No published articles yet. Check back soon.</div>
+    <div id="resourcesArticleList"></div>
+  </main>
+  <div id="site-footer"></div>
+  <script>
+fetch('/partials/footer.html')
+  .then(r => r.text())
+  .then(html => {
+    document.getElementById('site-footer').innerHTML = html;
+  });
+</script>
+
+  <div id="legal-modals-root"></div>
+  <script src="/js/legal-modals.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
+  <script src="/firebase/init.js"></script>
+  <script src="/js/firebase-init.js"></script>
+  <script src="/js/resources.js"></script>
+</body>
+</html>

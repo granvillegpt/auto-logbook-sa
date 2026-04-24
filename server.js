@@ -17,7 +17,6 @@ if (!getGoogleApiKey()) {
 
 const express = require('express');
 const fs = require('fs');
-const { resolveRouteAddresses } = require('./functions/src/routeAddressResolver');
 const { resolveStoreAddresses } = require('./functions/src/resolveStore');
 const {
   assertResolveStoreAllowedHttp,
@@ -265,6 +264,7 @@ app.post('/api/generateLogbook', async (req, res) => {
       if (
         msg === 'Invalid token' ||
         msg === 'Token already used' ||
+        msg === 'No tokens remaining' ||
         msg === 'Invalid token state'
       ) {
         return res.status(403).json({ success: false, error: msg });
@@ -295,19 +295,20 @@ app.post('/api/generateLogbook', async (req, res) => {
   }
 });
 
-/** Single batch endpoint: UI sends routes, server resolves all addresses (calls Google only from server). */
+/** Legacy resolver — disabled; use Cloud Functions upload / reprocess flows instead. */
 app.post('/api/resolveRouteAddresses', (req, res) => {
-  if (!GOOGLE_API_KEY) return res.status(500).json({ error: 'Server missing Google API key.' });
-  const body = req.body && (req.body.routes != null ? req.body : { routes: req.body });
-  const routes = Array.isArray(body.routes) ? body.routes : [];
-  const debug = !!body.debug;
-  if (routes.length === 0) return res.status(400).json({ error: 'Missing or empty routes array.' });
-  resolveRouteAddresses(routes, GOOGLE_API_KEY, { debug })
-    .then((resolved) => res.json(resolved))
-    .catch((err) => {
-      console.error('resolveRouteAddresses failed:', err);
-      res.status(500).json({ error: err.message || 'Address resolution failed.' });
-    });
+  console.warn("LEGACY RESOLVER HIT:", {
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+    time: new Date().toISOString()
+  });
+
+  res.status(410).json({
+    error: "LEGACY RESOLVER DISABLED"
+  });
+
+  return;
 });
 
 
@@ -332,7 +333,42 @@ app.post('/engine/resolve-store', async (req, res) => {
   }
 });
 
-// Admin: fetch unresolved stores (missing coordinates)
+function storeRowNeedsCoordinateAttention(data) {
+  if (!data || typeof data !== 'object') return true;
+  if (data.missingCoords === true || data.needsAdminReview === true) return true;
+  const lat = data.lat;
+  const lng = data.lng;
+  if (lat == null || lng == null) return true;
+  const ln = Number(lat);
+  const lg = Number(lng);
+  return !Number.isFinite(ln) || !Number.isFinite(lg);
+}
+
+async function resolveStoreLocationRefForAdminUpdateServer(firestore, body) {
+  const col = firestore.collection('storeLocations');
+  const id = body && body.id != null ? String(body.id).trim() : '';
+  const canonicalName =
+    body && body.canonicalName != null ? String(body.canonicalName).trim() : '';
+  const normalizedQuery =
+    body && body.normalizedQuery != null ? String(body.normalizedQuery).trim() : '';
+
+  if (id) {
+    const ref = col.doc(id);
+    const snap = await ref.get();
+    if (snap.exists) return ref;
+  }
+  for (const key of [canonicalName, normalizedQuery]) {
+    if (!key) continue;
+    const ref = col.doc(key);
+    const snap = await ref.get();
+    if (snap.exists) return ref;
+    const q = await col.where('canonicalName', '==', key).limit(1).get();
+    if (!q.empty) return q.docs[0].ref;
+  }
+  return null;
+}
+
+// Admin: fetch unresolved stores (missing coordinates) — authoritative storeLocations only.
 app.get('/admin/missing-coords', async (req, res) => {
   try {
     const key = req.headers['x-admin-key'];
@@ -347,32 +383,64 @@ app.get('/admin/missing-coords', async (req, res) => {
     }
 
     const db = admin.firestore();
-
-    // Prefer needsAdminReview as the primary admin signal, but include legacy missingCoords entries.
-    const collection = db.collection('apiCache_storeResolution');
-
-    const [needsReviewSnap, missingCoordsSnap] = await Promise.all([
-      collection.where('needsAdminReview', '==', true).get(),
-      collection.where('missingCoords', '==', true).get(),
-    ]);
-
-    const seen = new Set();
-    const rows = [];
-
-    needsReviewSnap.docs.forEach((doc) => {
-      seen.add(doc.id);
-      rows.push(doc.data());
-    });
-
-    missingCoordsSnap.docs.forEach((doc) => {
-      if (seen.has(doc.id)) return;
-      rows.push(doc.data());
-    });
+    const snap = await db.collection('storeLocations').get();
+    const rows = snap.docs
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          ...data,
+          id: doc.id,
+          normalizedQuery: doc.id
+        };
+      })
+      .filter((row) => storeRowNeedsCoordinateAttention(row));
 
     return res.status(200).json(rows);
   } catch (err) {
     console.error('[MISSING COORDS ERROR]', err);
     return res.status(500).json({ error: 'Failed to fetch unresolved stores' });
+  }
+});
+
+app.post('/admin/update-coords', async (req, res) => {
+  try {
+    const key = req.headers['x-admin-key'];
+    if (key !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { lat, lng } = req.body || {};
+    const latN = lat != null ? Number(lat) : NaN;
+    const lngN = lng != null ? Number(lng) : NaN;
+    if (!Number.isFinite(latN) || !Number.isFinite(lngN)) {
+      return res.status(400).json({ error: 'Invalid or missing lat/lng' });
+    }
+
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) {
+      admin.initializeApp();
+    }
+    const db = admin.firestore();
+    const ref = await resolveStoreLocationRefForAdminUpdateServer(db, req.body || {});
+    if (!ref) {
+      return res.status(404).json({ error: 'Store document not found in storeLocations' });
+    }
+
+    await ref.set(
+      {
+        lat: latN,
+        lng: lngN,
+        missingCoords: false,
+        needsAdminReview: false,
+        updatedAt: Date.now()
+      },
+      { merge: true }
+    );
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('[UPDATE COORDS ERROR]', err);
+    return res.status(500).json({ error: err.message || 'Update failed' });
   }
 });
 

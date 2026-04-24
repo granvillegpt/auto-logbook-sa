@@ -4,6 +4,9 @@
  */
 import { getApprovedReviews } from './services/reviewService.js';
 
+const IS_ADMIN_PAGE =
+  typeof window !== 'undefined' && window.location.pathname.includes('admin');
+
 function starsHtml(rating) {
   let s = '';
   for (let i = 1; i <= 5; i++) {
@@ -68,6 +71,7 @@ function escapeHtml(str) {
 }
 
 function loadApprovedReviews() {
+  if (IS_ADMIN_PAGE) return;
   const el = document.getElementById('reviewsList');
   if (!el) return;
   const app = typeof firebase !== 'undefined' && firebase.apps && firebase.apps[0];
@@ -221,6 +225,7 @@ function initReviewModal() {
 }
 
 function init() {
+  if (IS_ADMIN_PAGE) return;
   loadApprovedReviews();
   initStarRating();
   initReviewForm();

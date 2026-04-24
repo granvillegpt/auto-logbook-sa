@@ -89,17 +89,34 @@
       if (!location) continue;
       var purpose = getVal(row, 'Purpose');
       var frequency = getVal(row, 'Frequency');
-      var startDateRaw = getVal(row, 'Start Date') || getVal(row, 'StartDate');
+      var rawStartDate =
+        row["Start Date"] ||
+        row["StartDate"] ||
+        row.startDate ||
+        null;
+      var parsedStartDate = toDateStr(rawStartDate);
+      if (!parsedStartDate) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("Missing startDate from row:", row);
+        }
+      }
       var endDateRaw = getVal(row, 'End Date') || getVal(row, 'EndDate');
-      var startDate = toDateStr(startDateRaw);
       var endDate = toDateStr(endDateRaw);
+      var freqForMode =
+        row["Frequency"] != null && String(row["Frequency"]).trim() !== ""
+          ? String(row["Frequency"])
+          : String(frequency || "");
+      var lowerFreq = freqForMode.toLowerCase();
+      var isRecurring =
+        lowerFreq.indexOf("recurring") !== -1 && lowerFreq.indexOf("non-recurring") === -1;
+      var routeMode = isRecurring ? "cycle" : "date";
       var route = {
-        mode: 'date',
+        mode: routeMode,
         customer: location,
         location: location,
         purpose: purpose,
         frequency: frequency,
-        startDate: startDate,
+        startDate: parsedStartDate,
         endDate: endDate,
         sourceRow: i + 1,
         rowIndex: i + 1,
@@ -109,6 +126,38 @@
         province: null,
         fullAddress: null
       };
+      var freqValue = String(row["Frequency"] != null ? row["Frequency"] : (frequency || "")).toLowerCase();
+      var isOnceOff =
+        freqValue.indexOf("once") !== -1 ||
+        freqValue.indexOf("once-off") !== -1 ||
+        freqValue.indexOf("once off") !== -1;
+      if (isOnceOff && route.startDate) {
+        route.endDate = route.startDate;
+      }
+      if (route.mode === "date" && route.startDate) {
+        route.date = route.startDate;
+      }
+      if (typeof console !== "undefined" && console.log && route.mode === "date") {
+        console.log("DATE MODE ROUTE:", {
+          mode: route.mode,
+          startDate: route.startDate,
+          date: route.date
+        });
+      }
+      if (typeof console !== "undefined" && console.log) {
+        console.log("ONCE-OFF CHECK:", {
+          freq: row["Frequency"],
+          start: route.startDate,
+          end: route.endDate
+        });
+      }
+      if (routeMode === "cycle") {
+        route.weeks = frequencyToWeeks(frequency);
+        route.days = parseDaysFromWeekdayColumns(row);
+      }
+      if (typeof console !== "undefined" && console.log) {
+        console.log("ROUTE MODE:", route.mode, "FREQ:", row["Frequency"]);
+      }
       routes.push(route);
     }
     if (typeof console !== 'undefined' && console.log) {

@@ -1856,6 +1856,15 @@ function generateLogbookEntries(visits, vehicleOpeningKm, homeAddress, startDate
         });
     }
 
+    let currentKM = Number(vehicleOpeningKm || 0);
+    for (let i = 0; i < generatedDays.length; i++) {
+        const entry = generatedDays[i];
+        const businessKm = Number(entry.businessKm) || 0;
+        entry.openingKm = currentKM;
+        entry.closingKm = currentKM + businessKm;
+        currentKM = entry.closingKm;
+    }
+
     return generatedDays;
 }
 
@@ -2046,12 +2055,8 @@ async function runLogbookEngine(input) {
 
     const forcedClosing = Number(closingKm);
 
-    for (let i = 0; i < entries.length; i++) {
-        entries[i].openingKm = Number(openingKm);
-
-        entries[i].closingKm = Number.isFinite(forcedClosing)
-            ? forcedClosing
-            : Number(openingKm);
+    if (entries.length > 0 && Number.isFinite(forcedClosing)) {
+        entries[entries.length - 1].closingKm = forcedClosing;
     }
 
     // ===============================

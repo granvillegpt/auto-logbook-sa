@@ -3,6 +3,9 @@
  */
 (function () {
   'use strict';
+  const IS_ADMIN_PAGE =
+    typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  if (IS_ADMIN_PAGE) return;
   if (!window.firebaseReady || !window.db) {
     console.error("🔥 FIREBASE NOT READY");
     return;

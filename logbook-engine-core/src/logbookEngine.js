@@ -666,16 +666,14 @@ function generateLogbookEntries(visits, distanceMap, vehicleOpeningKm, homeAddre
         });
     }
 
-    // Recalculate odometer continuity from vehicleOpeningKm forward
-    // This ensures manual entries don't break odometer progression
-    let runningOdometer = vehicleOpeningKm;
+    // Rolling odometer: each opening = previous closing; first row = vehicle opening; only businessKm advances the dial.
+    let currentKM = Number(vehicleOpeningKm || 0);
     for (let i = 0; i < generatedDays.length; i++) {
         const entry = generatedDays[i];
-        entry.openingKm = runningOdometer;
         const businessKm = Number(entry.businessKm) || 0;
-        const privateKm = Number(entry.privateKm) || 0;
-        entry.closingKm = runningOdometer + businessKm + privateKm;
-        runningOdometer = entry.closingKm;
+        entry.openingKm = currentKM;
+        entry.closingKm = currentKM + businessKm;
+        currentKM = entry.closingKm;
     }
 
     return generatedDays;

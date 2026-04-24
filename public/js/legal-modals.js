@@ -1,6 +1,7 @@
 /**
  * Load shared legal modals (Disclaimer, Terms, Privacy, Refund) from components/legal-modals.html
- * and bind footer links and close buttons. Used by index.html and logbook.html.
+ * and bind modal chrome. Footer legal links use document-level delegation so they work when the
+ * footer is injected after load (e.g. /partials/footer.html). Used by index.html and logbook.html.
  */
 (function () {
   'use strict';
@@ -28,17 +29,24 @@
     }
   }
 
+  var footerLegalDelegationInstalled = false;
+
+  function installFooterLegalDelegation() {
+    if (footerLegalDelegationInstalled) return;
+    footerLegalDelegationInstalled = true;
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!t) return;
+      if (t.nodeType !== 1) t = t.parentElement;
+      if (!t || typeof t.id !== 'string' || !t.id) return;
+      if (t.id === 'openPrivacyFooter') { e.preventDefault(); openModal('privacyModal'); return; }
+      if (t.id === 'openTermsFooter') { e.preventDefault(); openModal('termsModal'); return; }
+      if (t.id === 'openDisclaimerFooter') { e.preventDefault(); openModal('disclaimerModal'); return; }
+      if (t.id === 'openRefundPolicyFooter') { e.preventDefault(); openModal('refundPolicyModal'); return; }
+    });
+  }
+
   function bindLegalModals() {
-    var openPrivacy = byId('openPrivacyFooter');
-    var openTerms = byId('openTermsFooter');
-    var openDisclaimer = byId('openDisclaimerFooter');
-    var openRefund = byId('openRefundPolicyFooter');
-
-    if (openPrivacy) openPrivacy.addEventListener('click', function (e) { e.preventDefault(); openModal('privacyModal'); });
-    if (openTerms) openTerms.addEventListener('click', function (e) { e.preventDefault(); openModal('termsModal'); });
-    if (openDisclaimer) openDisclaimer.addEventListener('click', function (e) { e.preventDefault(); openModal('disclaimerModal'); });
-    if (openRefund) openRefund.addEventListener('click', function (e) { e.preventDefault(); openModal('refundPolicyModal'); });
-
     [ 'disclaimerModal', 'termsModal', 'privacyModal', 'refundPolicyModal' ].forEach(function (id) {
       var modal = byId(id);
       if (!modal) return;
@@ -56,10 +64,9 @@
     var root = byId('legal-modals-root');
     if (!root) return;
 
-    var path = 'components/legal-modals.html';
-    if (typeof window.location !== 'undefined' && window.location.pathname.indexOf('/logbook') !== -1) {
-      path = 'components/legal-modals.html';
-    }
+    installFooterLegalDelegation();
+
+    var path = '/components/legal-modals.html';
 
     fetch(path)
       .then(function (r) { return r.text(); })
